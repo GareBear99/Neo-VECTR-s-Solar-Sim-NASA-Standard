@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Neo-VECTR's Solar Sim v17 — Truth Builder + Merge Rules</title>
+<style>
+:root{
+  --bg:#03050b; --panel:rgba(7,11,24,.84); --line:rgba(116,198,255,.16); --text:#eef6ff; --muted:#a9bed8;
+  --accent:#74c6ff; --accent2:#d58cff; --good:#89f2c8; --warn:#ffbf78; --danger:#ff7f86;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 28%, #09122a 0%, #03050b 64%, #010205 100%);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+.hud{position:fixed;z-index:3;backdrop-filter:blur(12px);background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 36px rgba(0,0,0,.35)}
+:root{--hud-gap:12px;--topbar-h:64px;--footer-h:58px;--left-w:min(410px,calc(100vw - 24px));--right-w:min(380px,calc(100vw - 24px));--side-top:calc(var(--hud-gap) * 2 + var(--topbar-h));--side-max-h:calc(100vh - var(--side-top) - var(--footer-h) - (var(--hud-gap) * 2));}
+#topbar{left:12px;top:12px;right:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+#topbar .group, #footer .group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#left,#right{top:var(--side-top);padding:14px;max-height:max(220px,var(--side-max-h));overflow:auto}
+#left{left:12px;width:var(--left-w)}
+#right{right:12px;width:var(--right-w)}
+#footer{left:12px;right:12px;bottom:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+body.stack-panels #left{left:12px;right:12px;width:min(430px,calc(100vw - 24px));top:var(--side-top)}
+body.stack-panels #right{left:12px;right:12px;width:min(430px,calc(100vw - 24px));top:calc(var(--side-top) + min(46vh, 380px));max-height:calc(100vh - (var(--side-top) + min(46vh, 380px)) - var(--footer-h) - (var(--hud-gap) * 2));}
+body.stack-panels #left{max-height:min(42vh, 340px)}
+body.compact-panels .hud{border-radius:14px}
+body.compact-panels #left,body.compact-panels #right{padding:10px}
+body.compact-panels p{font-size:12px;line-height:1.34}
+body.compact-panels .section+.section{margin-top:10px;padding-top:10px}
+body.compact-panels .pill{padding:5px 8px}
+.pill{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
+button,select,input,textarea{font:inherit}
+button,select,input[type="text"],input[type="range"]{accent-color:var(--accent)}
+button,select,input[type="text"]{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:8px 10px}
+button:hover,select:hover,input[type="text"]:hover{border-color:rgba(116,198,255,.34)}
+button{cursor:pointer}
+h1{font-size:18px;margin:0 0 8px} h2{font-size:14px;color:var(--accent);margin:0 0 8px} p,li{font-size:13px;color:var(--muted);line-height:1.44}
+.section+.section{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:8px 10px;font-size:12px;color:var(--muted)}
+.kv div:nth-child(2n){text-align:right;color:var(--text)}
+.legend{display:grid;grid-template-columns:12px 1fr;gap:8px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.dot{width:12px;height:12px;border-radius:999px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:1px 6px;border-radius:8px;color:var(--text)}
+.small{font-size:11px;color:var(--muted)} .good{color:var(--good)} .warn{color:var(--warn)} .danger{color:var(--danger)}
+.stack{display:grid;gap:8px} .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#catalogLog{white-space:pre-wrap;font-size:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px;max-height:160px;overflow:auto}
+input[type="range"]{width:100%}
+@media (max-width: 860px){ body{overflow:auto} canvas{position:absolute;height:62vh} #topbar,#left,#right,#footer{position:static;margin:10px;width:auto;max-height:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="topbar" class="hud">
+  <div class="group">
+    <strong>Neo-VECTR's Solar Sim v17</strong>
+    <span class="pill">Proven truth mode · no-overlap HUD · persistence</span>
+    <span class="pill">Aim-target zoom + proven orbital view</span>
+    <span class="pill">Truth builder + merge rules</span>
+    <span class="pill">2D but visually 3D</span>
+  </div>
+  <div class="group">
+    <button id="pauseBtn">Pause</button>
+    <button id="resetBtn">Reset view</button>
+    <button id="inBtn">Zoom in</button>
+    <button id="outBtn">Zoom out</button>
+    <select id="scopeSel">
+      <option value="universe">Universe</option>
+      <option value="milkyway">Milky Way</option>
+      <option value="solar">Star System</option>
+      <option value="surface">Proven Orbit View</option>
+    </select>
+    <select id="focusSel"></select>
+  </div>
+</div>
+<div id="left" class="hud">
+  <h1 id="panelTitle">Universe</h1>
+  <p id="panelDesc">This build stays strict proven-truth mode, but now hardens the pack pipeline: bundled sample pack files are included in the ZIP, CSV parsing is quote-safe, sample packs carry epoch/source metadata, imported packs are schema-checked for duplicates and invalid bodies, and focus/search use the live proven dataset instead of stale seed-only lists.</p>
+  <div class="section">
+    <h2 id="statsHeading">Selection</h2>
+    <div id="stats" class="kv"></div>
+  </div>
+  <div class="section">
+    <h2>Navigation</h2>
+    <p><code>Wheel</code> zoom · <code>Drag</code> pan / rotate · <code>Click</code> select · <code>Enter</code> descend · <code>Backspace</code> ascend · <code>1-4</code> force layer · <code>Space</code> pause · <code>[ ]</code> speed · <code>F</code> focus selected</p>
+    <p class="small">Wheel zoom pulls the camera toward your aim point. Proven Orbit View now shows only authored real bodies and curated proven orbital objects for the selected body. Synthetic blueprint nodes are disabled.</p>
+  </div>
+  <div class="section">
+    <h2>Search / bookmarks</h2>
+    <div class="stack">
+      <input id="searchBox" type="text" placeholder="Search object… e.g. Earth, Andromeda, TRAPPIST-1"/>
+      <div class="row"><button id="searchBtn">Find</button><button id="bookmarkBtn">Bookmark selected</button><select id="bookmarkSel"><option value="">Jump to bookmark…</option></select></div>
+      <p class="small">Bookmarks are local to this HTML file session.</p>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Legend</h2>
+    <div class="legend">
+      <div class="dot" style="background:#ffd166"></div><div>Spiral / warm stellar population</div>
+      <div class="dot" style="background:#b9d3ff"></div><div>Elliptical / older population</div>
+      <div class="dot" style="background:#8cf0c6"></div><div>Milky Way host systems</div>
+      <div class="dot" style="background:#67a8ff"></div><div>Earth / oceanic world</div>
+      <div class="dot" style="background:#ff7c57"></div><div>Rocky / warm worlds</div>
+      <div class="dot" style="background:#d9b57c"></div><div>Gas giants</div>
+    </div>
+  </div>
+</div>
+<div id="right" class="hud">
+  <div class="section" style="padding-top:0;border-top:0">
+    <h2>Engine</h2>
+    <div id="engineStats" class="kv"></div>
+  </div>
+  <div class="section">
+    <h2>Debug / truth path</h2>
+    <div id="truthPath" class="kv"></div>
+    <p class="small">Shows the active graph path, target node, render tier, and whether you are seeing truth data or a compressed presentation layer.</p>
+  </div>
+  <div class="section">
+    <h2>Accuracy / sources</h2>
+    <div id="sourceStats" class="kv"></div>
+    <p class="small">Truth fields are authored from public astronomy references and kept separate from render compression. Visual scale, glow, and shell styling are presentation layers only. Imported truth packs must include source + epoch metadata.</p>
+  </div>
+  <div class="section">
+    <h2>Time scale</h2>
+    <input id="timeSlider" type="range" min="-6" max="8" step="1" value="3"/>
+    <p class="small">Universe and Milky Way layers use cinematic drift only. Star-system mode uses analytic orbit motion in sim days/sec. Surface mode freezes orbital time by default.</p>
+  </div>
+  <div class="section">
+    <h2>Catalog ingest / strict validation</h2>
+    <div class="stack">
+      <div class="row"><button id="sampleBtn">Load sample truth pack</button><button id="bundledBtn">Load bundled proven packs</button><button id="resetImportsBtn">Reset imported truth</button><button id="exportBtn">Export truth pack</button><input id="catalogFile" type="file" accept=".json,.csv" multiple/></div>
+      <p class="small">Truth mode stays locked to proven objects only. Imported packs are now validated for schema completeness, duplicate keys/IDs, valid target bodies, and required source/epoch metadata before rows are accepted. Included external pack files can be loaded directly from the ZIP.</p>
+      <div id="catalogLog">ready\nIncluded sample files: truth_pack_hosts.json/csv, truth_pack_galaxies.json/csv, truth_pack_orbits.json/csv</div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proven orbit target</h2>
+    <div class="row"><button data-preset="earth">Earth</button><button data-preset="moon">Moon</button><button data-preset="mars">Mars</button><button data-preset="jupiter">Jupiter</button><button data-preset="saturn">Saturn</button></div>
+    <p class="small">Proven Orbit View replaces the old close-surface view. It focuses on real moons and curated proven orbital objects around the selected body rather than synthetic planning shells.</p>
+  </div>
+
+  <div class="section">
+    <h2>Proven orbit controls</h2>
+    <div class="stack">
+      <div class="row"><select id="orbitClassSel"><option value="leo">LEO / low shell</option><option value="polar">Polar / survey</option><option value="meo">MEO / relay</option><option value="geo">GEO / synchronous</option><option value="transfer">Transfer / staging</option><option value="halo">Halo / watch</option></select><select id="purposeSel"><option value="sensor">Sensor</option><option value="relay">Relay</option><option value="dock">Dock</option><option value="cargo">Cargo</option><option value="defense">Defense</option><option value="science">Science</option></select></div>
+      <div class="row"><button id="addOrbitBtn" disabled>Add disabled in truth mode</button><button id="removeOrbitBtn" disabled>Remove disabled</button></div>
+      <div class="row"><button id="cycleOrbitBtn" disabled>Cycle disabled</button><button id="validateBtn">Validate truth view</button></div>
+      <p class="small">This layer is now locked to proven-orbit viewing. No seeded orbit nodes are added here; only curated real moons and authored proven orbital objects are shown.</p>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Blueprint object</h2>
+    <div id="blueprintStats" class="kv"></div>
+    <p class="small">Click a proven orbital object to inspect it. The selected object is highlighted in the orbital shell.</p>
+  </div>
+  <div class="section">
+    <h2>Blueprint validator</h2>
+    <div id="validatorStats" class="kv"></div>
+    <p class="small">Checks pack rejections, duplicate IDs, invalid orbit ranges, and unsafe ring crowding within the current orbital shell.</p>
+  </div>
+  <div class="section">
+    <h2>Truth integrity</h2>
+    <div id="integrityStats" class="kv"></div>
+    <p class="small">Global diagnostics for all loaded proven data: pack counts, duplicate pressure, missing parent references, invalid bodies, and metadata completeness.</p>
+  </div>
+</div>
+<div id="footer" class="hud">
+  <div class="group"><span id="status">Running</span><span class="pill" id="epochLabel"></span><span class="pill" id="speedLabel"></span></div>
+  <div class="group"><span class="pill" id="modePill">Universe layer</span><span class="pill" id="pathPill">Universe</span></div>
+</div>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d',{alpha:false});
+const $=id=>document.getElementById(id);
+const pauseBtn=$('pauseBtn'),resetBtn=$('resetBtn'),inBtn=$('inBtn'),outBtn=$('outBtn'),scopeSel=$('scopeSel'),focusSel=$('focusSel');
+const panelTitle=$('panelTitle'),panelDesc=$('panelDesc'),stats=$('stats'),engineStats=$('engineStats'),sourceStats=$('sourceStats'),truthPath=$('truthPath'),epochLabel=$('epochLabel'),speedLabel=$('speedLabel'),status=$('status'),modePill=$('modePill'),pathPill=$('pathPill'),timeSlider=$('timeSlider');
+const searchBox=$('searchBox'),searchBtn=$('searchBtn'),bookmarkBtn=$('bookmarkBtn'),bookmarkSel=$('bookmarkSel'),catalogLog=$('catalogLog'),catalogFile=$('catalogFile'),sampleBtn=$('sampleBtn'),exportBtn=$('exportBtn'),mergeRuleSel=$('mergeRuleSel'),validateAllBtn=$('validateAllBtn'),exportSplitBtn=$('exportSplitBtn'),exportBundleBtn=$('exportBundleBtn');
+const orbitClassSel=$('orbitClassSel'),purposeSel=$('purposeSel'),addOrbitBtn=$('addOrbitBtn'),removeOrbitBtn=$('removeOrbitBtn'),cycleOrbitBtn=$('cycleOrbitBtn'),validateBtn=$('validateBtn'),blueprintStats=$('blueprintStats'),validatorStats=$('validatorStats'),integrityStats=$('integrityStats');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)); const lerp=(a,b,t)=>a+(b-a)*t; const DEG=Math.PI/180; const AU_KM=149597870.7;
+const epoch=new Date('2000-01-01T12:00:00Z');
+const dataSources={solar:'JPL / NASA orbital elements (authored static reference set in this offline build)',sizes:'NASA Solar System body radii (authored static reference set)',exoplanets:'Named confirmed host subset (offline curated)',milkyway:'Named nearby/exoplanet-host stars only (offline curated)',galaxies:'Named real galaxy subset (offline curated)',orbitBlueprint:'Curated proven orbital object subset + proven-only truth packs'};
+const orbitClassDefs={leo:{label:'LEO / low shell',ring:0.32,ecc:0.02,color:'#74c6ff'},polar:{label:'Polar / survey',ring:0.46,ecc:0.12,color:'#9cf2d3'},meo:{label:'MEO / relay',ring:0.62,ecc:0.07,color:'#ffca6a'},geo:{label:'GEO / synchronous',ring:0.82,ecc:0.01,color:'#d58eff'},transfer:{label:'Transfer / staging',ring:1.02,ecc:0.22,color:'#ff9b7a'},halo:{label:'Halo / watch',ring:1.24,ecc:0.16,color:'#e5f4ff'}};
+const purposeColors={sensor:'#74c6ff',relay:'#ffca6a',dock:'#d58eff',cargo:'#89f2c8',defense:'#ff7f86',science:'#b7d0ff'};
+function objectTint(role){ return purposeColors[role]||'#eef6ff'; }
+function updateHudLayout(){ const root=document.documentElement; const topH=Math.ceil(($('topbar')?.offsetHeight||64)); const footH=Math.ceil(($('footer')?.offsetHeight||58)); root.style.setProperty('--topbar-h', topH+'px'); root.style.setProperty('--footer-h', footH+'px'); const leftW=Math.min(410, Math.max(260, innerWidth-24)); const rightW=Math.min(380, Math.max(260, innerWidth-24)); root.style.setProperty('--left-w', leftW+'px'); root.style.setProperty('--right-w', rightW+'px'); const needsHorizontalStack = innerWidth < (leftW + rightW + 64); const availableH = innerHeight - (topH + footH + 48); const needsVerticalStack = availableH < 420; const needsCompact = innerHeight < 860 || innerWidth < 1180; document.body.classList.toggle('stack-panels', needsHorizontalStack || needsVerticalStack); document.body.classList.toggle('compact-panels', needsCompact); }
+window.addEventListener('resize',()=>{ setTimeout(()=>{ updateHudLayout(); rebuildBgLayer(); markUiDirty(); },0); }); setTimeout(()=>{ updateHudLayout(); rebuildBgLayer(); markUiDirty(); },0);
+function resize(){const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));canvas.width=Math.floor(innerWidth*dpr);canvas.height=Math.floor(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0);} window.addEventListener('resize',resize); resize();
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+const rng=mulberry32(1337);
+const solarBodies=[
+  {key:'sun',name:'Sun',type:'star',color:'#ffd166',radiusKm:696340,aAU:0,e:0,iDeg:0,OmegaDeg:0,omegaDeg:0,L0Deg:0,periodDays:1,tiltDeg:7.25,spinHours:609.12,desc:'Central star.'},
+  {key:'mercury',name:'Mercury',type:'planet',color:'#b8bcc6',radiusKm:2439.7,aAU:0.38709893,e:0.20563069,iDeg:7.00487,OmegaDeg:48.33167,omegaDeg:29.12478,L0Deg:252.25084,periodDays:87.9691,tiltDeg:0.034,spinHours:1407.6,desc:'Innermost rocky planet.'},
+  {key:'venus',name:'Venus',type:'planet',color:'#d8a15b',radiusKm:6051.8,aAU:0.72333199,e:0.00677323,iDeg:3.39471,OmegaDeg:76.68069,omegaDeg:54.85229,L0Deg:181.97973,periodDays:224.701,tiltDeg:177.36,spinHours:-5832.5,desc:'Retrograde warm world.'},
+  {key:'earth',name:'Earth',type:'planet',color:'#67a8ff',radiusKm:6371,aAU:1.00000011,e:0.01671022,iDeg:0.00005,OmegaDeg:-11.26064,omegaDeg:114.20783,L0Deg:100.46435,periodDays:365.256,tiltDeg:23.439,spinHours:23.9345,desc:'Primary surface-entry target.'},
+  {key:'moon',name:'Moon',type:'moon',color:'#d9dde6',radiusKm:1737.4,parent:'earth',aAU:384400/AU_KM,e:0.0549,iDeg:5.145,OmegaDeg:125.08,omegaDeg:318.15,L0Deg:218.316,periodDays:27.321661,tiltDeg:6.68,spinHours:655.728,desc:'Earth satellite.'},
+  {key:'mars',name:'Mars',type:'planet',color:'#ff7c57',radiusKm:3389.5,aAU:1.52366231,e:0.09341233,iDeg:1.85061,OmegaDeg:49.57854,omegaDeg:286.4623,L0Deg:355.45332,periodDays:686.98,tiltDeg:25.19,spinHours:24.6229,desc:'Red world.'},
+  {key:'jupiter',name:'Jupiter',type:'planet',color:'#d9b57c',radiusKm:69911,aAU:5.20336301,e:0.04839266,iDeg:1.30530,OmegaDeg:100.55615,omegaDeg:273.8777,L0Deg:34.40438,periodDays:4332.589,tiltDeg:3.13,spinHours:9.925,desc:'Largest planet.'},
+  {key:'saturn',name:'Saturn',type:'planet',color:'#e2c78d',radiusKm:58232,aAU:9.53707032,e:0.05415060,iDeg:2.48446,OmegaDeg:113.71504,omegaDeg:339.392,L0Deg:49.94432,periodDays:10759.22,tiltDeg:26.73,spinHours:10.656,rings:true,desc:'Ringed gas giant.'},
+  {key:'uranus',name:'Uranus',type:'planet',color:'#8fd9ff',radiusKm:25362,aAU:19.19126393,e:0.04716771,iDeg:0.76986,OmegaDeg:74.22988,omegaDeg:96.998857,L0Deg:313.23218,periodDays:30688.5,tiltDeg:97.77,spinHours:-17.24,desc:'Ice giant.'},
+  {key:'neptune',name:'Neptune',type:'planet',color:'#4ea1ff',radiusKm:24622,aAU:30.06896348,e:0.00858587,iDeg:1.76917,OmegaDeg:131.72169,omegaDeg:272.8461,L0Deg:304.88003,periodDays:60182,tiltDeg:28.32,spinHours:16.11,desc:'Outer giant.'},
+  {key:'pluto',name:'Pluto',type:'dwarf planet',color:'#c7b08b',radiusKm:1188.3,aAU:39.48168677,e:0.24880766,iDeg:17.14175,OmegaDeg:110.30347,omegaDeg:113.76329,L0Deg:238.92881,periodDays:90560,tiltDeg:122.53,spinHours:-153.2928,desc:'Dwarf world.'}
+];
+const solarByKey=Object.fromEntries(solarBodies.map(b=>[b.key,b]));
+const galaxies=[
+  {key:'milkyway',name:'Milky Way',type:'barred spiral',color:'#ffd166',distMly:0,size:1.0,x:0,y:0},
+  {key:'andromeda',name:'Andromeda',type:'spiral',color:'#e2ceff',distMly:2.54,size:1.12,x:2.4,y:-0.6},
+  {key:'triangulum',name:'Triangulum',type:'spiral',color:'#ffd89c',distMly:3.0,size:0.56,x:3.0,y:-0.12},
+  {key:'lmc',name:'Large Magellanic Cloud',type:'irregular',color:'#9fe7ff',distMly:0.163,size:0.22,x:-0.75,y:0.48},
+  {key:'smc',name:'Small Magellanic Cloud',type:'irregular',color:'#85d6ff',distMly:0.20,size:0.14,x:-0.95,y:0.73},
+  {key:'m81',name:'Bode\'s Galaxy',type:'spiral',color:'#ffd39d',distMly:11.8,size:0.36,x:5.2,y:1.6},
+  {key:'m82',name:'Cigar Galaxy',type:'starburst',color:'#ffb48a',distMly:11.9,size:0.24,x:5.35,y:1.82},
+  {key:'sombrero',name:'Sombrero Galaxy',type:'spiral',color:'#f2d0ac',distMly:31.1,size:0.28,x:11.2,y:-2.2},
+  {key:'centaurusA',name:'Centaurus A',type:'lenticular',color:'#ffbd8b',distMly:13,size:0.32,x:-4.8,y:-2.6},
+  {key:'m87',name:'Virgo A',type:'elliptical',color:'#c0cfff',distMly:53.5,size:0.50,x:16.2,y:-1.8},
+  {key:'ngc1300',name:'NGC 1300',type:'barred spiral',color:'#fdd69e',distMly:61,size:0.32,x:-18.0,y:1.0}
+];
+// Proven truth mode: synthetic survey galaxies removed.
+const galaxyByKey=Object.fromEntries(galaxies.map(g=>[g.key,g]));
+const BASE_GALAXIES=galaxies.map(g=>({...g}));
+function starColor(temp){ if(temp<3500) return '#ff9b7a'; if(temp<5000) return '#ffd9a8'; if(temp<6200) return '#fff0c7'; if(temp<7500) return '#f8f8ff'; return '#b6d4ff'; }
+const hosts=[];
+const seedHosts=[
+  {key:'proxima',name:'Proxima Centauri',distLy:4.24,temp:3050,planets:2,theta:5.4,r:0.06},
+  {key:'barnard',name:'Barnard\'s Star',distLy:5.96,temp:3200,planets:1,theta:5.7,r:0.08},
+  {key:'trappist1',name:'TRAPPIST-1',distLy:40.7,temp:2550,planets:7,theta:0.55,r:0.16},
+  {key:'tauCeti',name:'Tau Ceti',distLy:11.9,temp:5340,planets:4,theta:0.35,r:0.14},
+  {key:'51peg',name:'51 Pegasi',distLy:50.1,temp:5800,planets:1,theta:2.7,r:0.25},
+  {key:'55cnc',name:'55 Cancri',distLy:41,temp:5200,planets:5,theta:2.95,r:0.22},
+  {key:'toi700',name:'TOI-700',distLy:101,temp:3480,planets:4,theta:4.9,r:0.33},
+  {key:'hd209458',name:'HD 209458',distLy:159,temp:6075,planets:1,theta:3.7,r:0.44},
+  {key:'kepler186',name:'Kepler-186',distLy:582,temp:3750,planets:5,theta:1.8,r:0.74}
+];
+for(const s of seedHosts) hosts.push({...s});
+// Proven truth mode: synthetic host cloud removed.
+for(const h of hosts){ const armNoise=(Math.sin(h.theta*2.4)+Math.cos(h.theta*1.7))*0.035; h.x=Math.cos(h.theta)*h.r; h.y=Math.sin(h.theta)*(h.r*0.42+armNoise); h.color=starColor(h.temp); }
+const hostByKey=Object.fromEntries(hosts.map(h=>[h.key,h]));
+const BASE_HOSTS=hosts.map(h=>({...h}));
+const extraHostData=[];
+let scope='universe', paused=false, simDays=218.7, earthSpin=0, surfaceZoom=1.0, targetLat=22, targetLon=-75, surfaceBody='earth';
+let selectedKey='milkyway'; const camera={x:0,y:0,zoom:1}; let drag=null; const bookmarks=[]; const pointer={x:innerWidth*0.5,y:innerHeight*0.5}; let gpsMode=false; let selectedBlueprintId=''; let lastValidator={ok:true,issues:0,notes:['truth mode ready']}; const blueprintState={}; let currentBlueprintHitboxes=[]; const SAVE_KEY='neo_vectr_solar_sim_v17_state';
+let uiDirty=true, lastUiAt=0, uiIntervalMs=140, autoBootLoaded=false;
+const bgCanvas=document.createElement('canvas'); const bgCtx=bgCanvas.getContext('2d');
+function markUiDirty(){ uiDirty=true; }
+let mergeRule='skip'; const TRUTH_MODE=true; const provenOrbitOverrides={}; const importedCatalogMeta=[]; scopeSel.value=scope;
+function validateCurrentBlueprint(body){ const bp=orbitBlueprint(body); const latest=importedCatalogMeta[importedCatalogMeta.length-1]?.validation||null; const issues=(latest?latest.rejected:0); lastValidator={ok:issues===0,issues,notes:['truth mode locked','proven objects: '+bp.objects.length,'proven moon count: '+bp.knownMoons.length,'imported packs: '+importedCatalogMeta.length, latest?('last pack valid '+latest.valid+' / rejected '+latest.rejected):'no imported packs']}; validatorStats.innerHTML=''; [['Mode','truth locked'],['Objects',bp.objects.length],['Moons',bp.knownMoons.length],['Pack issues',issues],['Imported packs',importedCatalogMeta.length]].forEach(([k,v])=>{ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; validatorStats.appendChild(a); validatorStats.appendChild(b); }); return lastValidator; }
+function currentBlueprintSelection(body){ const bp=orbitBlueprint(body); return bp.objects.find(o=>o.id===selectedBlueprintId)||bp.knownMoons.find(o=>o.id===selectedBlueprintId)||null; }
+function getBlueprintState(body){ if(!blueprintState[body]) blueprintState[body]={objects:[],validator:null}; return blueprintState[body]; }
+function saveState(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({scope,selectedKey,camera,surfaceZoom,targetLat,targetLon,surfaceBody,bookmarks,timeSlider:timeSlider?.value||'3',selectedBlueprintId,blueprintState,mergeRule})); }catch(e){} }
+function refreshBookmarkUi(){ bookmarkSel.innerHTML='<option value=>Jump to bookmark…</option>'; bookmarks.forEach((b,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=(b.label||b.key)+' ['+b.scope+']'; bookmarkSel.appendChild(o); }); }
+function loadState(){ try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw) return; const s=JSON.parse(raw); if(s.scope) scope=s.scope; if(s.selectedKey) selectedKey=s.selectedKey; if(s.camera){ camera.x=+s.camera.x||0; camera.y=+s.camera.y||0; camera.zoom=clamp(+s.camera.zoom||1,0.12,48); } if(typeof s.surfaceZoom==='number') surfaceZoom=clamp(s.surfaceZoom,0.65,12); if(typeof s.targetLat==='number') targetLat=clamp(s.targetLat,-85,85); if(typeof s.targetLon==='number') targetLon=((s.targetLon+540)%360)-180; if(s.surfaceBody) surfaceBody=s.surfaceBody; if(Array.isArray(s.bookmarks)){ bookmarks.splice(0,bookmarks.length,...s.bookmarks); refreshBookmarkUi(); } if(s.timeSlider!=null) timeSlider.value=String(s.timeSlider); if(s.selectedBlueprintId) selectedBlueprintId=s.selectedBlueprintId; if(s.blueprintState && typeof s.blueprintState==='object'){ Object.keys(s.blueprintState).forEach(k=>blueprintState[k]=s.blueprintState[k]); } if(s.mergeRule){ mergeRule=s.mergeRule; if(mergeRuleSel) mergeRuleSel.value=mergeRule; } scopeSel.value=scope; gpsMode=surfaceZoom>=2.4; }catch(e){} }
+
+function currentScale(){ return Math.min(innerWidth,innerHeight)*(scope==='universe'?0.058:scope==='milkyway'?0.44:0.014)*camera.zoom; }
+function screenToWorld(mx,my){ const s=currentScale(); const ay=scope==='universe'?0.55:scope==='milkyway'?0.56:0.55; return {x:camera.x + (mx-innerWidth*0.5)/s, y:camera.y + (my-innerHeight*ay)/s}; }
+function zoomToward(mx,my,dir){
+  if(scope==='surface'){
+    const before={lat:targetLat, lon:targetLon, zoom:surfaceZoom};
+    const cx=innerWidth*0.5, cy=innerHeight*0.53; const r=Math.min(innerWidth,innerHeight)*0.17*surfaceZoom;
+    const nx=clamp((mx-cx)/Math.max(1,r),-1,1); const ny=clamp((my-cy)/Math.max(1,r),-1,1);
+    const worldLon=((Math.asin(nx)/DEG)-targetLon); const worldLat=targetLat-ny*70;
+    surfaceZoom=clamp(surfaceZoom*(dir>0?1.18:1/1.18),0.65,12);
+    const pull=dir>0?0.16:0.08;
+    targetLon=((targetLon + worldLon*pull + 540)%360)-180;
+    targetLat=clamp(lerp(targetLat,worldLat,pull*0.6),-85,85);
+    gpsMode=surfaceZoom>=2.4;
+    return;
+  }
+  const before=screenToWorld(mx,my);
+  camera.zoom=clamp(camera.zoom*(dir>0?1.22:1/1.22),0.12,48);
+  const after=screenToWorld(mx,my);
+  camera.x += before.x-after.x;
+  camera.y += before.y-after.y;
+  autoPromoteScope();
+}
+function solarBodyScreen(body){ const p=keplerPos(body,simDays); return projectSolar(p.x*10,p.y*10); }
+function populateFocus(){ const opts=[]; opts.push(['milkyway','Galaxy: Milky Way']); galaxies.filter(g=>g.key!=='milkyway').slice(0,32).forEach(g=>opts.push([g.key,'Galaxy: '+g.name])); hosts.slice(0,48).forEach(h=>opts.push([h.key,'Host: '+h.name])); solarBodies.forEach(b=>opts.push([b.key,'Body: '+b.name])); focusSel.innerHTML=''; for(const [value,label] of opts){ const o=document.createElement('option'); o.value=value; o.textContent=label; focusSel.appendChild(o);} focusSel.value=selectedKey; }
+function logCatalog(msg){ catalogLog.textContent = msg + '\n' + catalogLog.textContent; }
+function resetView(){ if(scope==='universe'){camera.x=0;camera.y=0;camera.zoom=1; selectedKey='milkyway';} if(scope==='milkyway'){camera.x=0;camera.y=0;camera.zoom=1.4; selectedKey='proxima';} if(scope==='solar'){camera.x=0;camera.y=0;camera.zoom=0.92; selectedKey='earth';} if(scope==='surface'){surfaceZoom=1.0; targetLat=22; targetLon=-75; selectedKey=surfaceBody; gpsMode=false;} focusSel.value=selectedKey; saveState(); }
+function setScope(next, keepFocus=true){ scope=next; scopeSel.value=next; if(!keepFocus) resetView(); if(scope==='surface' && !['earth','moon','mars'].includes(selectedKey)) selectedKey=surfaceBody; modePill.textContent = ({universe:'Universe layer',milkyway:'Milky Way layer',solar:'Star-system layer',surface:'Proven orbit layer'})[scope]; saveState(); }
+function zoomStep(dir,mx=pointer.x,my=pointer.y){ if(dir>0) pickObject(mx,my,true); zoomToward(mx,my,dir); autoPromoteScope(dir,mx,my); }
+function autoPromoteScope(dir=0,mx=pointer.x,my=pointer.y){ if(scope==='universe' && camera.zoom>5.2){ if(dir>0) pickObject(mx,my,true); setScope('milkyway'); camera.zoom=1.6; camera.x=0; camera.y=0; if(!hostByKey[selectedKey]) selectedKey='proxima'; } else if(scope==='milkyway' && camera.zoom>7.5){ if(dir>0) pickObject(mx,my,true); setScope('solar'); camera.zoom=0.95; camera.x=0; camera.y=0; if(!solarByKey[selectedKey]) selectedKey='earth'; } else if(scope==='solar' && camera.zoom>8.2 && ['earth','moon','mars'].includes(selectedKey)){ surfaceBody=selectedKey; setScope('surface'); gpsMode=surfaceZoom>=2.4; selectedBlueprintId=''; } else if(scope==='solar' && camera.zoom<0.22){ setScope('milkyway'); camera.zoom=1.6; } else if(scope==='milkyway' && camera.zoom<0.22){ setScope('universe'); camera.zoom=1.0; } focusSel.value=selectedKey; }
+function descend(){ if(scope==='universe'){ setScope('milkyway'); camera.zoom=1.4; camera.x=0; camera.y=0; if(!hostByKey[selectedKey]) selectedKey='proxima'; } else if(scope==='milkyway'){ setScope('solar'); camera.zoom=0.92; camera.x=0; camera.y=0; if(!solarByKey[selectedKey]) selectedKey='earth'; } else if(scope==='solar'){ if(solarByKey[selectedKey] && selectedKey!=='sun'){ surfaceBody=selectedKey; setScope('surface'); gpsMode=surfaceZoom>=2.4; selectedBlueprintId=''; } } focusSel.value=selectedKey; }
+function ascend(){ if(scope==='surface'){ setScope('solar'); camera.zoom=1.2; } else if(scope==='solar'){ setScope('milkyway'); camera.zoom=1.6; } else if(scope==='milkyway'){ setScope('universe'); camera.zoom=1.0; } }
+pauseBtn.onclick=()=>{paused=!paused; pauseBtn.textContent=paused?'Resume':'Pause'; status.textContent=paused?'Paused':'Running'; saveState();}; resetBtn.onclick=()=>resetView(); inBtn.onclick=()=>{descend(); saveState();}; outBtn.onclick=()=>{ascend(); saveState();};
+scopeSel.onchange=()=>{ setScope(scopeSel.value,false); saveState(); };
+focusSel.onchange=()=>{ selectedKey=focusSel.value; focusSelected(); saveState(); };
+timeSlider.oninput=()=>{ simDays=Math.pow(2, Number(timeSlider.value)); if(Number(timeSlider.value)<0) simDays = -Math.pow(2, Math.abs(Number(timeSlider.value))); saveState(); };
+searchBtn.onclick=()=>searchObject(); searchBox.addEventListener('keydown',e=>{ if(e.key==='Enter') searchObject(); });
+bookmarkBtn.onclick=()=>{ const name=getSelectedName(); if(!name) return; bookmarks.push({key:selectedKey,label:name,scope,body:surfaceBody,lat:targetLat,lon:targetLon}); refreshBookmarkUi(); bookmarkSel.value=String(bookmarks.length-1); saveState(); };
+bookmarkSel.onchange=()=>{ if(bookmarkSel.value==='') return; const b=bookmarks[+bookmarkSel.value]; if(!b) return; selectedKey=b.key; surfaceBody=b.body||surfaceBody; targetLat=b.lat??targetLat; targetLon=b.lon??targetLon; setScope(b.scope); focusSel.value=selectedKey; focusSelected(); saveState(); };
+Array.from(document.querySelectorAll('[data-preset]')).forEach(btn=>btn.onclick=()=>{ surfaceBody=btn.dataset.preset; selectedKey=surfaceBody; selectedBlueprintId=''; setScope('surface'); gpsMode=surfaceZoom>=2.4; focusSel.value=selectedKey; saveState(); });
+orbitClassSel.disabled=true; purposeSel.disabled=true;
+orbitClassSel.onchange=()=>logCatalog('truth mode locked: orbit class editing disabled');
+purposeSel.onchange=()=>logCatalog('truth mode locked: purpose editing disabled');
+addOrbitBtn.onclick=()=>logCatalog('truth mode locked: add disabled');
+removeOrbitBtn.onclick=()=>removeSelectedBlueprintObject();
+cycleOrbitBtn.onclick=()=>cycleSelectedOrbitClass();
+validateBtn.onclick=()=>{ validateCurrentBlueprint(surfaceBody); saveState(); };
+sampleBtn.disabled=false; sampleBtn.onclick=()=>importCatalog(JSON.stringify(sampleTruthPack()),'sample_truth_pack.json');
+catalogFile.disabled=false; catalogFile.onchange=async ()=>{ const files=[...(catalogFile.files||[])]; if(!files.length) return; for(const f of files){ importCatalog(await f.text(), f.name||'catalog.json'); } catalogFile.value=''; };
+exportBtn.onclick=()=>exportTruthPack();
+mergeRuleSel.onchange=()=>{ mergeRule=mergeRuleSel.value||'skip'; saveState(); logCatalog('merge rule set to '+mergeRule); };
+validateAllBtn.onclick=()=>{ const report=validateGlobalTruth(); logCatalog('global truth validation '+(report.ok?'ok':'issues')+' · duplicates '+report.duplicateKeys+' · missing source '+report.missingSource+' · missing epoch '+report.missingEpoch+' · invalid bodies '+report.invalidOrbitBodies); };
+exportSplitBtn.onclick=()=>exportSplitTruthPacks();
+exportBundleBtn.onclick=()=>exportTruthBundle();
+function parseCSV(text){
+  const src=String(text||'').replace(/^\uFEFF/,'');
+  const rows=[]; let row=[]; let cell=''; let q=false;
+  for(let i=0;i<src.length;i++){
+    const ch=src[i];
+    if(q){
+      if(ch==='"'){
+        if(src[i+1]==='"'){ cell+='"'; i++; }
+        else q=false;
+      } else cell+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===','){ row.push(cell); cell=''; }
+      else if(ch==='\n'){ row.push(cell); if(row.some(v=>String(v).trim()!=='')) rows.push(row); row=[]; cell=''; }
+      else if(ch==='\r'){}
+      else cell+=ch;
+    }
+  }
+  row.push(cell);
+  if(row.some(v=>String(v).trim()!=='')) rows.push(row);
+  if(rows.length<2) return [];
+  const headers=rows.shift().map(s=>String(s).trim());
+  return rows.map(r=>{ const obj={}; headers.forEach((h,i)=>obj[h]=String(r[i]??'').trim()); return obj; });
+}
+function validateTruthRows(rows,name){
+  const report={ok:true, valid:0, rejected:0, duplicate:0, missingSource:0, missingEpoch:0, invalidBody:0, unknownType:0, unproven:0, missingRequired:0, packName:name||'import'};
+  const seen=new Set();
+  const knownTypes=new Set(['host','galaxy','orbit','orbit_object']);
+  (Array.isArray(rows)?rows:[]).forEach((r,idx)=>{
+    const type=String(r?.type||'').toLowerCase();
+    if(String(r?.proven ?? 'true').toLowerCase()==='false'){ report.rejected++; report.unproven++; return; }
+    if(!knownTypes.has(type)){ report.rejected++; report.unknownType++; return; }
+    if(!String(r?.source||'').trim()){ report.rejected++; report.missingSource++; return; }
+    if(!String(r?.epoch||'').trim()){ report.rejected++; report.missingEpoch++; return; }
+    let key='';
+    if(type==='host'){
+      if(!String(r?.name||'').trim() || !String(r?.distLy||'').trim()){ report.rejected++; report.missingRequired++; return; }
+      key='host:' + String(r.key||r.name||idx).toLowerCase();
+    } else if(type==='galaxy'){
+      if(!String(r?.name||'').trim() || !String(r?.distMly||'').trim()){ report.rejected++; report.missingRequired++; return; }
+      key='galaxy:' + String(r.key||r.name||idx).toLowerCase();
+    } else {
+      const body=String(r?.body||'').toLowerCase();
+      if(!body || !solarByKey[body]){ report.rejected++; report.invalidBody++; return; }
+      if(!String(r?.id||'').trim() || !String(r?.name||'').trim()){ report.rejected++; report.missingRequired++; return; }
+      key='orbit:' + body + ':' + String(r.id||idx).toLowerCase();
+    }
+    if(seen.has(key)){ report.rejected++; report.duplicate++; return; }
+    seen.add(key);
+    report.valid++;
+  });
+  report.ok = report.rejected===0;
+  return report;
+}
+function normalizeTruthRow(r,idx){
+  const type=String(r.type||'').toLowerCase();
+  const proven = !(String(r.proven ?? 'true').toLowerCase()==='false');
+  if(!proven) return null;
+  if(type==='host' || (('distLy' in r) && (('temp' in r) || ('planets' in r)))){
+    const key=String(r.key||('imp_host_'+(hosts.length+idx))).toLowerCase().replace(/[^a-z0-9_\-]/g,'_');
+    const theta=Number(r.theta);
+    const rr=clamp(Number(r.r||0.18),0.01,1.2);
+    const h={type:'host', key, name:String(r.name||key), distLy:+r.distLy||100, temp:+r.temp||5200, planets:+r.planets||1, theta:Number.isFinite(theta)?theta:(rng()*Math.PI*2), r:rr, source:String(r.source||'truth-pack'), epoch:String(r.epoch||'unspecified')};
+    h.x=Math.cos(h.theta)*h.r;
+    h.y=Math.sin(h.theta)*(h.r*0.42 + Math.sin(h.theta*2.5)*0.03);
+    h.color=starColor(h.temp);
+    return h;
+  }
+  if(type==='galaxy' || (('distMly' in r) && ('size' in r))){
+    const key=String(r.key||('imp_galaxy_'+(galaxies.length+idx))).toLowerCase().replace(/[^a-z0-9_\-]/g,'_');
+    return {bucket:'galaxy', key, name:String(r.name||key), type:String(r.galaxyType||r.kind||'galaxy'), distMly:+r.distMly||10, size:clamp(+r.size||0.25,0.05,2.5), x:Number(r.x ?? ((rng()-0.5)*30)), y:Number(r.y ?? ((rng()-0.5)*12)), color:String(r.color||'#dfe8ff'), source:String(r.source||'truth-pack'), epoch:String(r.epoch||'unspecified')};
+  }
+  if(type==='orbit' || type==='orbit_object'){
+    const body=String(r.body||'earth').toLowerCase();
+    if(!solarByKey[body]) return null;
+    return {bucket:'orbit', body, id:String(r.id||('imp_orbit_'+body+'_'+idx)).toLowerCase().replace(/[^a-z0-9_\-]/g,'_'), name:String(r.name||('Imported '+body+' object '+idx)), ring:clamp(+r.ring||0.7,0.2,1.5), angleOffset:+r.angleOffset||0, size:clamp(+r.size||4,2,12), tint:String(r.tint||'#eef6ff'), role:String(r.role||'spacecraft'), source:String(r.source||'truth-pack'), epoch:String(r.epoch||'unspecified'), status:String(r.status||'proven')};
+  }
+  return null;
+}
+
+function bundledTruthPacks(){ return [
+  {name:'Nearby Proven Hosts Expanded', rows:[
+    {type:'host',proven:true,key:'proxima',name:'Proxima Centauri',distLy:4.2465,temp:3042,planets:2,theta:0.12,r:0.14,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'barnards_star',name:"Barnard's Star",distLy:5.96,temp:3134,planets:1,theta:0.22,r:0.16,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'wolf_359',name:'Wolf 359',distLy:7.86,temp:2800,planets:1,theta:0.31,r:0.18,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'lalande_21185',name:'Lalande 21185',distLy:8.31,temp:3601,planets:2,theta:0.38,r:0.20,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'ross_128',name:'Ross 128',distLy:11.0,temp:3192,planets:1,theta:0.48,r:0.22,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'trappist1',name:'TRAPPIST-1',distLy:39.5,temp:2559,planets:7,theta:0.58,r:0.24,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'tau_ceti',name:'Tau Ceti',distLy:11.9,temp:5344,planets:4,theta:0.74,r:0.26,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'epsilon_eridani',name:'Epsilon Eridani',distLy:10.5,temp:5084,planets:1,theta:1.02,r:0.18,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'51pegasi',name:'51 Pegasi',distLy:50.1,temp:5794,planets:1,theta:1.28,r:0.31,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'hd209458',name:'HD 209458',distLy:159,temp:6065,planets:1,theta:1.56,r:0.45,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'kepler186',name:'Kepler-186',distLy:492,temp:3788,planets:5,theta:1.82,r:0.58,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'toi700',name:'TOI-700',distLy:101.4,temp:3480,planets:4,theta:2.16,r:0.37,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'hr8799',name:'HR 8799',distLy:129,temp:7193,planets:4,theta:2.46,r:0.43,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'fomalhaut',name:'Fomalhaut',distLy:25.1,temp:8590,planets:1,theta:2.74,r:0.28,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'},
+    {type:'host',proven:true,key:'beta_pictoris',name:'Beta Pictoris',distLy:63.4,temp:8052,planets:2,theta:2.96,r:0.34,source:'NASA Exoplanet Archive (curated subset)',epoch:'2026-03 curated'}
+  ]},
+  {name:'Named Proven Galaxies Expanded', rows:[
+    {type:'galaxy',proven:true,key:'whirlpool',name:'Whirlpool Galaxy',galaxyType:'spiral',distMly:31,size:0.34,x:10.4,y:2.0,color:'#ffd39d',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'pinwheel',name:'Pinwheel Galaxy',galaxyType:'spiral',distMly:20.9,size:0.38,x:7.8,y:1.3,color:'#ffe0a8',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'black_eye',name:'Black Eye Galaxy',galaxyType:'spiral',distMly:17,size:0.24,x:6.2,y:-1.1,color:'#f3d3aa',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'cartwheel',name:'Cartwheel Galaxy',galaxyType:'lenticular ring',distMly:500,size:0.42,x:-24.0,y:3.2,color:'#bfe3ff',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'ngc6744',name:'NGC 6744',galaxyType:'spiral',distMly:30,size:0.30,x:-9.4,y:2.2,color:'#ffd8a0',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'ngc5128',name:'Centaurus A',galaxyType:'peculiar lenticular',distMly:13,size:0.32,x:-4.8,y:-2.6,color:'#ffbd8b',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'m104',name:'Sombrero Galaxy',galaxyType:'spiral',distMly:31.1,size:0.28,x:11.2,y:-2.2,color:'#f2d0ac',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'m87',name:'Virgo A',galaxyType:'elliptical',distMly:53.5,size:0.50,x:16.2,y:-1.8,color:'#c0cfff',source:'NED (curated subset)',epoch:'2026-03 curated'},
+    {type:'galaxy',proven:true,key:'ngc1300',name:'NGC 1300',galaxyType:'barred spiral',distMly:61,size:0.32,x:-18.0,y:1.0,color:'#fdd69e',source:'NED (curated subset)',epoch:'2026-03 curated'}
+  ]},
+  {name:'Proven Orbit Objects Expanded', rows:[
+    {type:'orbit',body:'earth',proven:true,id:'iss',name:'ISS',ring:0.46,angleOffset:0.20,size:4.5,tint:'#d8ecff',role:'space station',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'earth',proven:true,id:'hubble',name:'Hubble',ring:0.50,angleOffset:2.10,size:3.6,tint:'#c8d8ff',role:'space telescope',source:'NASA/ESA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'earth',proven:true,id:'jwst',name:'JWST',ring:1.16,angleOffset:1.40,size:3.8,tint:'#ffe7b8',role:'space telescope',source:'NASA/ESA/CSA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'earth',proven:true,id:'goes_east',name:'GOES East',ring:0.84,angleOffset:0.55,size:3.0,tint:'#d6f2ff',role:'weather satellite',source:'NOAA/NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'earth',proven:true,id:'goes_west',name:'GOES West',ring:0.84,angleOffset:2.75,size:3.0,tint:'#d6f2ff',role:'weather satellite',source:'NOAA/NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'moon',proven:true,id:'lro',name:'LRO',ring:0.46,angleOffset:1.00,size:3.0,tint:'#eef6ff',role:'lunar orbiter',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'moon',proven:true,id:'capstone',name:'CAPSTONE',ring:0.92,angleOffset:2.80,size:2.6,tint:'#d8e6ff',role:'lunar orbiter',source:'NASA/Advanced Space',epoch:'2026-03 curated'},
+    {type:'orbit',body:'mars',proven:true,id:'mro',name:'MRO',ring:0.44,angleOffset:0.60,size:3.2,tint:'#e9f1ff',role:'orbiter',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'mars',proven:true,id:'maven',name:'MAVEN',ring:0.58,angleOffset:2.20,size:3.2,tint:'#c8e8ff',role:'orbiter',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'mars',proven:true,id:'odyssey',name:'2001 Mars Odyssey',ring:0.52,angleOffset:3.10,size:2.9,tint:'#dbe9ff',role:'orbiter',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'jupiter',proven:true,id:'juno',name:'Juno',ring:0.70,angleOffset:1.40,size:3.6,tint:'#ffe7b8',role:'orbiter',source:'NASA',epoch:'2026-03 curated'},
+    {type:'orbit',body:'saturn',proven:true,id:'cassini',name:'Cassini (historical mission)',ring:0.72,angleOffset:0.90,size:3.5,tint:'#ffe4bd',role:'orbiter',source:'NASA/ESA/ASI',epoch:'mission archive'},
+    {type:'orbit',body:'sun',proven:true,id:'parker',name:'Parker Solar Probe',ring:0.36,angleOffset:2.10,size:3.0,tint:'#ffd7ae',role:'solar probe',source:'NASA',epoch:'2026-03 curated'}
+  ]}
+]; }
+
+
+function truthRowsSnapshot(){
+  const rows=[];
+  galaxies.filter(g=>g.key!=='milkyway').forEach(g=>rows.push({type:'galaxy',proven:true,key:g.key,name:g.name,galaxyType:g.type,distMly:g.distMly,size:g.size,x:g.x,y:g.y,color:g.color,source:g.source||'base',epoch:g.epoch||'base'}));
+  hosts.forEach(h=>rows.push({type:'host',proven:true,key:h.key,name:h.name,distLy:h.distLy,temp:h.temp,planets:h.planets,theta:h.theta,r:h.r,source:h.source||'base',epoch:h.epoch||'base'}));
+  Object.entries(provenOrbitOverrides).forEach(([body,arr])=>arr.forEach(o=>rows.push({type:'orbit',body,id:o.id,name:o.name,ring:o.ring,angleOffset:o.angleOffset,size:o.size,tint:o.tint,role:o.role,source:o.source||'base',epoch:o.epoch||'base',proven:true,status:o.status||'proven'})));
+  return rows;
+}
+function packSummary(){
+  const orbitCount=Object.values(provenOrbitOverrides).reduce((a,b)=>a+(Array.isArray(b)?b.length:0),0);
+  return {hosts:hosts.length, galaxies:galaxies.length-1, orbits:orbitCount, packs:importedCatalogMeta.length};
+}
+function richerScore(obj){
+  return ['source','epoch','role','status','color','temp','planets','distLy','distMly','ring','angleOffset','size','name'].reduce((n,k)=>n + ((obj && obj[k]!==undefined && obj[k]!==null && String(obj[k]).trim()!=='')?1:0), 0);
+}
+function upsertByMergeRule(kind,item){
+  if(kind==='galaxy'){
+    const existing=galaxyByKey[item.key];
+    if(!existing){ galaxies.push(item); galaxyByKey[item.key]=item; return 'added'; }
+    if(mergeRule==='skip') return 'skipped';
+    if(mergeRule==='replace' || (mergeRule==='richer' && richerScore(item)>richerScore(existing))){
+      const idx=galaxies.findIndex(g=>g.key===item.key); if(idx>=0) galaxies[idx]=item; galaxyByKey[item.key]=item; return 'replaced';
+    }
+    return 'skipped';
+  }
+  if(kind==='host'){
+    const existing=hostByKey[item.key];
+    if(!existing){ hosts.push(item); hostByKey[item.key]=item; return 'added'; }
+    if(mergeRule==='skip') return 'skipped';
+    if(mergeRule==='replace' || (mergeRule==='richer' && richerScore(item)>richerScore(existing))){
+      const idx=hosts.findIndex(h=>h.key===item.key); if(idx>=0) hosts[idx]=item; hostByKey[item.key]=item; return 'replaced';
+    }
+    return 'skipped';
+  }
+  if(kind==='orbit'){
+    const arr=provenOrbitOverrides[item.body]||(provenOrbitOverrides[item.body]=[]);
+    const idx=arr.findIndex(o=>o.id===item.id);
+    if(idx<0){ arr.push(item); return 'added'; }
+    if(mergeRule==='skip') return 'skipped';
+    if(mergeRule==='replace' || (mergeRule==='richer' && richerScore(item)>richerScore(arr[idx]))){ arr[idx]=item; return 'replaced'; }
+    return 'skipped';
+  }
+  return 'skipped';
+}
+function validateGlobalTruth(){
+  const seen=new Map();
+  const report={ok:true, totalHosts:hosts.length, totalGalaxies:Math.max(0,galaxies.length-1), totalOrbits:0, duplicateKeys:0, missingSource:0, missingEpoch:0, invalidOrbitBodies:0, packCount:importedCatalogMeta.length, conflicts:0};
+  for(const g of galaxies){ if(g.key==='milkyway') continue; const key='galaxy:'+g.key; if(seen.has(key)) report.duplicateKeys++; else seen.set(key,true); if(!String(g.source||'').trim()) report.missingSource++; if(!String(g.epoch||'').trim()) report.missingEpoch++; }
+  for(const h of hosts){ const key='host:'+h.key; if(seen.has(key)) report.duplicateKeys++; else seen.set(key,true); if(!String(h.source||'').trim()) report.missingSource++; if(!String(h.epoch||'').trim()) report.missingEpoch++; }
+  Object.entries(provenOrbitOverrides).forEach(([body,arr])=>{ (arr||[]).forEach(o=>{ report.totalOrbits++; const key='orbit:'+body+':'+o.id; if(seen.has(key)) report.duplicateKeys++; else seen.set(key,true); if(!solarByKey[body]) report.invalidOrbitBodies++; if(!String(o.source||'').trim()) report.missingSource++; if(!String(o.epoch||'').trim()) report.missingEpoch++; }); });
+  report.ok = !report.duplicateKeys && !report.missingSource && !report.missingEpoch && !report.invalidOrbitBodies;
+  if(integrityStats){ integrityStats.innerHTML=''; [['Hosts',report.totalHosts],['Galaxies',report.totalGalaxies],['Orbit objects',report.totalOrbits],['Active packs',report.packCount],['Duplicate keys',report.duplicateKeys],['Missing source',report.missingSource],['Missing epoch',report.missingEpoch],['Invalid orbit bodies',report.invalidOrbitBodies]].forEach(([k,v])=>{ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; integrityStats.appendChild(a); integrityStats.appendChild(b); }); }
+  return report;
+}
+function downloadText(filename,text,type='application/json'){ const blob=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),250); }
+function exportSplitTruthPacks(){
+  const rows=truthRowsSnapshot();
+  const hostsRows=rows.filter(r=>r.type==='host');
+  const galaxyRows=rows.filter(r=>r.type==='galaxy');
+  const orbitRows=rows.filter(r=>r.type==='orbit');
+  downloadText('truth_pack_hosts_export.json', JSON.stringify(hostsRows,null,2));
+  setTimeout(()=>downloadText('truth_pack_galaxies_export.json', JSON.stringify(galaxyRows,null,2)), 120);
+  setTimeout(()=>downloadText('truth_pack_orbits_export.json', JSON.stringify(orbitRows,null,2)), 240);
+  logCatalog('exported split truth packs from current proven dataset');
+}
+function exportTruthBundle(){
+  const payload={schema:'neo-vectr-truth-bundle-v1', exportedAt:new Date().toISOString(), mergeRule, summary:packSummary(), rows:truthRowsSnapshot()};
+  downloadText('truth_pack_bundle.json', JSON.stringify(payload,null,2));
+  logCatalog('exported truth bundle with '+payload.rows.length+' rows');
+}
+function applyTruthRows(rows,name){
+  const report=validateTruthRows(rows,name);
+  if(!Array.isArray(rows)){ logCatalog('catalog must be an array'); return; }
+  let hostCount=0, galCount=0, orbitCount=0, skipped=0, replaced=0;
+  rows.forEach((r,idx)=>{
+    const item=normalizeTruthRow(r,idx);
+    if(!item){ skipped++; return; }
+    let outcome='skipped';
+    if(item.bucket==='galaxy') outcome=upsertByMergeRule('galaxy', item);
+    else if(item.type==='host') outcome=upsertByMergeRule('host', item);
+    else if(item.bucket==='orbit') outcome=upsertByMergeRule('orbit', item);
+    if(outcome==='added'){ if(item.bucket==='galaxy') galCount++; else if(item.type==='host') hostCount++; else orbitCount++; }
+    else if(outcome==='replaced') replaced++;
+    else skipped++;
+  });
+  const globalReport=validateGlobalTruth();
+  importedCatalogMeta.push({name, hosts:hostCount, galaxies:galCount, orbits:orbitCount, skipped, replaced, mergeRule, validation:report, global:globalReport});
+  populateFocus();
+  markUiDirty();
+  updateUI();
+  validateCurrentBlueprint(surfaceBody);
+  const validationMsg = report.ok ? 'validation ok' : ('validation issues: dup '+report.duplicate+' · missing source '+report.missingSource+' · missing epoch '+report.missingEpoch+' · invalid body '+report.invalidBody+' · unknown type '+report.unknownType+' · rejected '+report.rejected);
+  logCatalog('imported proven rows from '+name+' · hosts '+hostCount+' · galaxies '+galCount+' · orbits '+orbitCount+' · replaced '+replaced+' · skipped '+skipped+' · merge '+mergeRule+' · '+validationMsg);
+  saveState();
+}
+function loadBundledTruthPacks(){
+  bundledTruthPacks().forEach(pack=>applyTruthRows(pack.rows,pack.name));
+}
+function resetImportedTruth(){
+  galaxies.length=0; BASE_GALAXIES.forEach(g=>{ galaxies.push({...g}); });
+  hosts.length=0; BASE_HOSTS.forEach(h=>{ hosts.push({...h}); });
+  Object.keys(galaxyByKey).forEach(k=>delete galaxyByKey[k]); galaxies.forEach(g=>galaxyByKey[g.key]=g);
+  Object.keys(hostByKey).forEach(k=>delete hostByKey[k]); hosts.forEach(h=>hostByKey[h.key]=h);
+  Object.keys(provenOrbitOverrides).forEach(k=>delete provenOrbitOverrides[k]);
+  importedCatalogMeta.length=0;
+  populateFocus();
+  markUiDirty();
+  updateUI();
+  validateCurrentBlueprint(surfaceBody);
+  validateGlobalTruth();
+  logCatalog('reset imported truth packs; base proven dataset restored');
+  saveState();
+}
+function sampleTruthPack(){ return [
+  {type:'orbit', body:'earth', proven:true, id:'iss', name:'ISS', ring:0.46, angleOffset:0.2, size:4.5, tint:'#d8ecff', role:'space station', source:'NASA', epoch:'2026-03 sample'},
+  {type:'orbit', body:'earth', proven:true, id:'hubble', name:'Hubble', ring:0.50, angleOffset:2.1, size:3.6, tint:'#c8d8ff', role:'space telescope', source:'NASA/ESA', epoch:'2026-03 sample'},
+  {type:'orbit', body:'moon', proven:true, id:'lro', name:'LRO', ring:0.46, angleOffset:1.0, size:3.0, tint:'#eef6ff', role:'lunar orbiter', source:'NASA', epoch:'2026-03 sample'},
+  {type:'orbit', body:'moon', proven:true, id:'capstone', name:'CAPSTONE', ring:0.92, angleOffset:2.8, size:2.6, tint:'#d8e6ff', role:'lunar orbiter', source:'NASA/Advanced Space', epoch:'2026-03 sample'},
+  {type:'orbit', body:'mars', proven:true, id:'mro', name:'MRO', ring:0.44, angleOffset:0.6, size:3.2, tint:'#e9f1ff', role:'orbiter', source:'NASA', epoch:'2026-03 sample'},
+  {type:'orbit', body:'mars', proven:true, id:'maven', name:'MAVEN', ring:0.58, angleOffset:2.2, size:3.2, tint:'#c8e8ff', role:'orbiter', source:'NASA', epoch:'2026-03 sample'},
+  {type:'orbit', body:'jupiter', proven:true, id:'juno', name:'Juno', ring:0.70, angleOffset:1.4, size:3.6, tint:'#ffe7b8', role:'orbiter', source:'NASA', epoch:'2026-03 sample'},
+  {type:'host', proven:true, key:'kepler442', name:'Kepler-442', distLy:1206, temp:4402, planets:1, theta:1.15, r:0.92, source:'NASA Exoplanet Archive', epoch:'2026-03 sample'},
+  {type:'galaxy', proven:true, key:'whirlpool', name:'Whirlpool Galaxy', galaxyType:'spiral', distMly:31, size:0.34, x:10.4, y:2.0, color:'#ffd39d', source:'NED', epoch:'2026-03 sample'}
+]; }
+function exportTruthPack(){
+  const rows=[];
+  galaxies.forEach(g=>rows.push({type:'galaxy', key:g.key, name:g.name, galaxyType:g.type||'galaxy', distMly:g.distMly, size:g.size, x:g.x, y:g.y, color:g.color, proven:true, source:g.source||'offline-curated', epoch:g.epoch||'unspecified'}));
+  hosts.forEach(h=>rows.push({type:'host', key:h.key, name:h.name, distLy:h.distLy, temp:h.temp, planets:h.planets, theta:h.theta, r:h.r, proven:true, source:h.source||'offline-curated', epoch:h.epoch||'unspecified'}));
+  Object.entries(provenOrbitOverrides).forEach(([body,list])=>list.forEach(o=>rows.push({type:'orbit', body, id:o.id, name:o.name, ring:o.ring, angleOffset:o.angleOffset||0, size:o.size, tint:o.tint, role:o.role, proven:true, source:o.source||'truth-pack', epoch:o.epoch||'unspecified', status:o.status||'proven'})));
+  const blob=new Blob([JSON.stringify(rows,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='neo_vectr_truth_pack.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),500);
+  logCatalog('exported truth pack rows '+rows.length);
+}
+function importCatalog(text,name){
+  let parsed, rows;
+  try{ parsed = name.toLowerCase().endsWith('.json') ? JSON.parse(text) : parseCSV(text); } catch(err){ logCatalog('parse failed: '+err.message); return; }
+  rows = Array.isArray(parsed) ? parsed : ((parsed && Array.isArray(parsed.rows)) ? parsed.rows : ((parsed && Array.isArray(parsed.items)) ? parsed.items : []));
+  if(parsed && parsed.mergeRule && mergeRuleSel){ mergeRuleSel.value=String(parsed.mergeRule); mergeRule=mergeRuleSel.value; }
+  applyTruthRows(rows,name);
+}
+function getSelectedName(){ return solarByKey[selectedKey]?.name || hostByKey[selectedKey]?.name || galaxyByKey[selectedKey]?.name || ''; }
+function searchObject(){ const q=searchBox.value.trim().toLowerCase(); if(!q) return; const all=[...solarBodies,...hosts,...galaxies]; const hit=all.find(o=>o.name.toLowerCase().includes(q)||o.key.toLowerCase().includes(q)); if(!hit){ logCatalog('search miss for "'+q+'"'); return; } selectedKey=hit.key; if(galaxyByKey[hit.key]) setScope('universe'); else if(hostByKey[hit.key]) setScope('milkyway'); else setScope('solar'); focusSel.value=selectedKey; focusSelected(); saveState(); }
+function focusSelected(){ if(scope==='surface'){ if(solarByKey[selectedKey]) surfaceBody=selectedKey; saveState(); return; } if(scope==='universe'){ const g=galaxyByKey[selectedKey] || galaxyByKey.milkyway; camera.x=g.x; camera.y=g.y; camera.zoom=Math.max(camera.zoom, g.key==='milkyway'?1.2:4.0); saveState(); return; } if(scope==='milkyway'){ const h=hostByKey[selectedKey] || hostByKey.proxima; camera.x=h.x; camera.y=h.y; camera.zoom=Math.max(camera.zoom,2.2); saveState(); return; } if(scope==='solar'){ camera.x=0; camera.y=0; if(['earth','moon','mars'].includes(selectedKey)) camera.zoom=Math.max(camera.zoom,1.2); saveState(); }}
+function fmt(n,d=2){ return Number(n).toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
+function keplerPos(body, days){ if(!body.aAU) return {x:0,y:0,z:0,rAU:0}; const M=((body.L0Deg-body.omegaDeg-body.OmegaDeg)%360)*DEG + (days/body.periodDays)*Math.PI*2; let E=M; for(let i=0;i<6;i++) E = E - (E - body.e*Math.sin(E) - M)/(1 - body.e*Math.cos(E)); const xv=body.aAU*(Math.cos(E)-body.e), yv=body.aAU*(Math.sqrt(1-body.e*body.e)*Math.sin(E)); const v=Math.atan2(yv,xv), r=Math.hypot(xv,yv); const O=body.OmegaDeg*DEG, i=body.iDeg*DEG, w=body.omegaDeg*DEG; const xh=r*(Math.cos(O)*Math.cos(v+w)-Math.sin(O)*Math.sin(v+w)*Math.cos(i)); const yh=r*(Math.sin(O)*Math.cos(v+w)+Math.cos(O)*Math.sin(v+w)*Math.cos(i)); const zh=r*(Math.sin(v+w)*Math.sin(i)); if(body.parent){ const p=keplerPos(solarByKey[body.parent], days); return {x:xh+p.x,y:yh+p.y,z:zh+p.z,rAU:r}; } return {x:xh,y:yh,z:zh,rAU:r}; }
+function rebuildBgLayer(){ if(!bgCtx) return; bgCanvas.width=innerWidth; bgCanvas.height=innerHeight; const g=bgCtx.createRadialGradient(innerWidth*0.5, innerHeight*0.36, 0, innerWidth*0.5, innerHeight*0.36, Math.max(innerWidth,innerHeight)*0.75); g.addColorStop(0,'#081229'); g.addColorStop(.6,'#03050b'); g.addColorStop(1,'#010205'); bgCtx.fillStyle=g; bgCtx.fillRect(0,0,innerWidth,innerHeight); for(let i=0;i<180;i++){ const x=(i*89.3)%innerWidth, y=(i*53.7)%innerHeight; const a=0.08+((i*17)%100)/240; bgCtx.fillStyle='rgba(255,255,255,'+a+')'; bgCtx.fillRect(x,y,1.2,1.2); } }
+function bg(){ if(bgCanvas.width!==innerWidth || bgCanvas.height!==innerHeight) rebuildBgLayer(); ctx.drawImage(bgCanvas,0,0); }
+function projectUniverse(x,y){ const s=Math.min(innerWidth,innerHeight)*0.058*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.55 + (y-camera.y)*s}; }
+function drawGalaxy(px,py,r,color,type){ ctx.save(); ctx.translate(px,py); ctx.globalCompositeOperation='lighter'; if(type.includes('elliptical')){ const rg=ctx.createRadialGradient(0,0,0,0,0,r); rg.addColorStop(0,'rgba(255,255,255,.8)'); rg.addColorStop(.35,color+'cc'); rg.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=rg; ctx.beginPath(); ctx.ellipse(0,0,r*1.5,r,0,0,Math.PI*2); ctx.fill(); }
+    else if(type.includes('irregular')){ for(let i=0;i<12;i++){ const a=i/12*Math.PI*2, rr=r*(0.45+Math.sin(i*1.7)*0.18+0.3); ctx.fillStyle=color+'66'; ctx.beginPath(); ctx.arc(Math.cos(a)*r*0.35,Math.sin(a)*r*0.25,rr*0.45,0,Math.PI*2); ctx.fill(); } }
+    else { for(let arm=0; arm<2; arm++){ ctx.strokeStyle=color+'90'; ctx.lineWidth=Math.max(1,r*0.08); ctx.beginPath(); for(let t=0;t<46;t++){ const tt=t/45*3.6; const a=tt*1.7 + arm*Math.PI; const rr=r*(0.18 + tt*0.23); ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr*0.72); } ctx.stroke(); } const rg=ctx.createRadialGradient(0,0,0,0,0,r); rg.addColorStop(0,'rgba(255,255,255,.9)'); rg.addColorStop(.25,color+'dd'); rg.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(0,0,r*0.45,0,Math.PI*2); ctx.fill(); }
+    ctx.restore(); }
+function drawUniverse(){ for(const g of galaxies){ const p=projectUniverse(g.x,g.y); const r=Math.max(2.2, g.size*18*camera.zoom); drawGalaxy(p.x,p.y,r,g.color,g.type); if(r>7||selectedKey===g.key){ ctx.fillStyle='rgba(235,243,255,.88)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(g.name,p.x+r+6,p.y-2);} if(selectedKey===g.key){ ctx.strokeStyle='rgba(116,198,255,.85)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(p.x,p.y,r+5,0,Math.PI*2); ctx.stroke(); } }
+}
+function projectMilky(x,y){ const s=Math.min(innerWidth,innerHeight)*0.44*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.56 + (y-camera.y)*s}; }
+function drawMilky(){ ctx.save(); const cx=innerWidth*0.5, cy=innerHeight*0.56; for(let arm=0; arm<4; arm++){ ctx.strokeStyle='rgba(116,198,255,.09)'; ctx.lineWidth=30*camera.zoom; ctx.beginPath(); for(let t=0;t<90;t++){ const tt=t/89; const a=tt*5.4 + arm*Math.PI/2; const rr=(0.08 + tt*0.88)*Math.min(innerWidth,innerHeight)*0.24*camera.zoom; const x=cx + Math.cos(a)*rr; const y=cy + Math.sin(a)*rr*0.42; if(t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke(); }
+  ctx.restore();
+  const drawn = hosts.length;
+  for(let i=0;i<drawn;i++){ const h=hosts[i]; const p=projectMilky(h.x,h.y); const rr=selectedKey===h.key?4.4:Math.max(1.2, 1.8 + (h.planets||1)*0.08); ctx.fillStyle=h.color; ctx.globalAlpha=selectedKey===h.key?1:.78; ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,Math.PI*2); ctx.fill(); if(selectedKey===h.key || (!h.anonymous && camera.zoom>1.55)){ ctx.fillStyle='rgba(235,243,255,.88)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(h.name,p.x+rr+6,p.y-2); } if(selectedKey===h.key){ ctx.strokeStyle='rgba(116,198,255,.9)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(p.x,p.y,rr+5,0,Math.PI*2); ctx.stroke(); } }
+  ctx.globalAlpha=1;
+}
+function projectSolar(x,y){ const s=Math.min(innerWidth,innerHeight)*0.014*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.55 + (y-camera.y)*s}; }
+function radiusPx(body){ const real=body.radiusKm/69911; return Math.max(body.key==='sun'?14:body.key==='earth'?4:2, Math.pow(real,0.45)*14); }
+function drawSolar(){ const sunP=projectSolar(0,0); const g=ctx.createRadialGradient(sunP.x,sunP.y,0,sunP.x,sunP.y,58); g.addColorStop(0,'rgba(255,240,180,.95)'); g.addColorStop(.28,'rgba(255,209,102,.7)'); g.addColorStop(1,'rgba(255,209,102,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sunP.x,sunP.y,58,0,Math.PI*2); ctx.fill();
+  const positions={}; for(const b of solarBodies){ positions[b.key]=keplerPos(b,simDays); }
+  for(const b of solarBodies){ if(!b.aAU || b.parent) continue; ctx.strokeStyle='rgba(116,198,255,.12)'; ctx.lineWidth=1; ctx.beginPath(); for(let t=0;t<=160;t++){ const dd=(t/160)*b.periodDays; const p=keplerPos(b,dd); const pp=projectSolar(p.x*10,p.y*10); if(t===0) ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y);} ctx.stroke(); }
+  for(const b of solarBodies){ const p=positions[b.key]; const pp=projectSolar(p.x*10,p.y*10); const rr=radiusPx(b); const rg=ctx.createRadialGradient(pp.x-rr*0.35,pp.y-rr*0.42,Math.max(1,rr*0.18),pp.x,pp.y,rr*1.18); if(b.key==='earth'){ rg.addColorStop(0,'rgba(135,208,255,.98)'); rg.addColorStop(.45,'rgba(69,122,224,.98)'); rg.addColorStop(1,'rgba(8,24,56,.98)'); } else if(b.key==='mars'){ rg.addColorStop(0,'rgba(255,184,136,.96)'); rg.addColorStop(.5,'rgba(198,92,58,.96)'); rg.addColorStop(1,'rgba(76,28,20,.98)'); } else if(['jupiter','saturn','uranus','neptune'].includes(b.key)){ rg.addColorStop(0,'rgba(255,244,220,.96)'); rg.addColorStop(.55,b.color); rg.addColorStop(1,'rgba(30,24,20,.95)'); } else { rg.addColorStop(0,'rgba(255,255,255,.92)'); rg.addColorStop(.45,b.color); rg.addColorStop(1,'rgba(22,26,36,.95)'); } ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.fill();
+    if(['jupiter','saturn','uranus','neptune'].includes(b.key)){ ctx.save(); ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.clip(); for(let band=-2; band<=2; band++){ ctx.strokeStyle='rgba(255,255,255,'+(0.08+Math.abs(band)*0.03)+')'; ctx.lineWidth=Math.max(1,rr*0.18); ctx.beginPath(); ctx.ellipse(pp.x, pp.y+band*rr*0.18, rr*0.92, rr*0.24, 0, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); }
+    if(b.key==='earth'){ ctx.save(); ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.clip(); ctx.fillStyle='rgba(90,196,116,.9)'; ctx.beginPath(); ctx.ellipse(pp.x-rr*0.18,pp.y-rr*0.06,rr*0.28,rr*0.18,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(pp.x+rr*0.22,pp.y+rr*0.02,rr*0.22,rr*0.16,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    if(b.rings){ ctx.strokeStyle='rgba(240,220,170,.55)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(pp.x,pp.y,rr*1.8,rr*0.72,0,0,Math.PI*2); ctx.stroke(); }
+    if(selectedKey===b.key){ ctx.strokeStyle='rgba(116,198,255,.92)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(pp.x,pp.y,rr+6,0,Math.PI*2); ctx.stroke(); }
+    ctx.fillStyle='rgba(235,243,255,.86)'; ctx.font='12px Inter, sans-serif'; if(rr>2.4 || selectedKey===b.key) ctx.fillText(b.name,pp.x+rr+5,pp.y-2);
+  }
+}
+function drawGlobeTexture(bodyName){ const cx=innerWidth*0.5, cy=innerHeight*0.53, r=Math.min(innerWidth,innerHeight)*0.17*surfaceZoom; gpsMode=surfaceZoom>=2.4; const grd=ctx.createRadialGradient(cx-r*0.35,cy-r*0.4,r*0.12,cx,cy,r); if(surfaceBody==='earth'){ grd.addColorStop(0,'#74bdff'); grd.addColorStop(.6,'#255fa8'); grd.addColorStop(1,'#0b1e3c'); } else if(surfaceBody==='mars'){ grd.addColorStop(0,'#f4b08d'); grd.addColorStop(.6,'#bc5e3b'); grd.addColorStop(1,'#47211a'); } else { grd.addColorStop(0,'#f0f2f6'); grd.addColorStop(.6,'#9ea7b5'); grd.addColorStop(1,'#3a4453'); }
+  ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  const lonOffset=(targetLon*DEG + earthSpin*0.2);
+  for(let lat=-75; lat<=75; lat+=15){ const y=Math.sin((lat-targetLat)*DEG)*r; const rx=Math.cos((lat-targetLat)*DEG)*r; ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(cx,cy+y,rx,rx*0.18,0,0,Math.PI*2); ctx.stroke(); }
+  for(let lon=-180; lon<180; lon+=15){ const a=(lon*DEG)+lonOffset; const x=Math.sin(a)*r; const squash=Math.max(0.1,Math.cos(a)); ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(cx+x*0.08,cy,r*Math.abs(squash)*0.06,r,Math.PI/2,0,Math.PI*2); ctx.stroke(); }
+  if(!gpsMode){
+    // synth planet shell
+    for(let i=0;i<28;i++){ const a=i*0.43 + lonOffset*1.25; const rr=r*(0.1 + (i%6)*0.025); const x=cx + Math.sin(a*1.7)*r*0.58; const y=cy + Math.cos(a*0.8 + i*0.2)*r*0.46; ctx.fillStyle=surfaceBody==='earth' ? 'rgba(84,175,101,0.20)' : surfaceBody==='mars' ? 'rgba(110,55,32,0.18)' : 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.ellipse(x,y,rr*0.9,rr*0.42,Math.sin(a)*0.4,0,Math.PI*2); ctx.fill(); }
+    if(['jupiter','saturn','uranus','neptune'].includes(surfaceBody)){ for(let band=-4; band<=4; band++){ ctx.strokeStyle='rgba(255,255,255,'+(0.08+Math.abs(band)*0.015)+')'; ctx.lineWidth=Math.max(1.5,r*0.06); ctx.beginPath(); ctx.ellipse(cx, cy+band*r*0.09, r*0.92, r*0.18, 0, 0, Math.PI*2); ctx.stroke(); } }
+  } else {
+    // GPS-style tile guidance near surface
+    const tileStep=12.5; const majorStep=45;
+    for(let lat=-90; lat<=90; lat+=tileStep){ const yy=Math.sin((lat-targetLat)*DEG)*r; const rx=Math.max(r*0.12,Math.cos((lat-targetLat)*DEG)*r); ctx.strokeStyle=(Math.abs(lat%majorStep)<0.001)?'rgba(116,198,255,.30)':'rgba(116,198,255,.14)'; ctx.lineWidth=(Math.abs(lat%majorStep)<0.001)?1.4:0.8; ctx.beginPath(); ctx.ellipse(cx,cy+yy,rx,Math.max(rx*0.18,1),0,0,Math.PI*2); ctx.stroke(); }
+    for(let lon=-180; lon<180; lon+=tileStep){ const a=(lon*DEG)+lonOffset; const x=Math.sin(a)*r; const squash=Math.max(0.08,Math.cos(a)); ctx.strokeStyle=(Math.abs(lon%majorStep)<0.001)?'rgba(116,198,255,.28)':'rgba(116,198,255,.12)'; ctx.lineWidth=(Math.abs(lon%majorStep)<0.001)?1.2:0.7; ctx.beginPath(); ctx.ellipse(cx+x*0.08,cy,r*Math.abs(squash)*0.05,r,Math.PI/2,0,Math.PI*2); ctx.stroke(); }
+    const px=clamp(Math.round((targetLon+180)/tileStep),0,999), py=clamp(Math.round((targetLat+90)/tileStep),0,999);
+    ctx.fillStyle='rgba(116,198,255,.18)'; ctx.fillRect(cx-r*0.92, cy+r*0.72, r*1.84, r*0.18);
+    ctx.fillStyle='rgba(235,243,255,.95)'; ctx.font='12px Inter, sans-serif'; ctx.fillText('GPS tile '+surfaceBody.toUpperCase()+' '+px+':'+py+'  lat '+targetLat.toFixed(2)+'°  lon '+targetLon.toFixed(2)+'°', cx-r*0.86, cy+r*0.84);
+    if(surfaceBody==='earth'){
+      ctx.fillStyle='rgba(84,175,101,.88)';
+      const continents=[[-0.55,-0.18,0.22,0.34],[-0.18,-0.06,0.16,0.24],[0.08,-0.16,0.34,0.16],[0.22,0.12,0.22,0.26],[0.54,-0.1,0.13,0.12]];
+      for(const c of continents){ const [x,y,w,h]=c; ctx.beginPath(); ctx.ellipse(cx + (x+Math.sin(lonOffset+x*2)*0.04)*r, cy + y*r, w*r*Math.max(.25,Math.cos(lonOffset+x*2)), h*r, 0, 0, Math.PI*2); ctx.fill(); }
+      ctx.fillStyle='rgba(255,255,255,.10)'; for(let i=0;i<14;i++){ ctx.beginPath(); ctx.ellipse(cx + Math.sin(i*0.8+lonOffset*1.2)*r*0.65, cy + Math.cos(i*0.45)*r*0.45, r*0.16, r*0.04, 0, 0, Math.PI*2); ctx.fill(); }
+    } else if(surfaceBody==='mars'){
+      ctx.fillStyle='rgba(110,55,32,.36)'; for(let i=0;i<9;i++){ ctx.beginPath(); ctx.arc(cx + Math.sin(i+lonOffset)*r*0.55, cy + Math.cos(i*0.7)*r*0.45, r*(0.04+((i%3)*0.018)), 0, Math.PI*2); ctx.fill(); }
+    } else {
+      ctx.fillStyle='rgba(255,255,255,.10)'; for(let i=0;i<11;i++){ ctx.beginPath(); ctx.arc(cx + Math.sin(i*0.73+lonOffset)*r*0.6, cy + Math.cos(i*0.52)*r*0.5, r*(0.03+((i%4)*0.014)), 0, Math.PI*2); ctx.fill(); }
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,r+1,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='rgba(116,198,255,.85)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(cx-18,cy); ctx.lineTo(cx+18,cy); ctx.moveTo(cx,cy-18); ctx.lineTo(cx,cy+18); ctx.stroke();
+  ctx.fillStyle='rgba(235,243,255,.9)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(bodyName+(gpsMode?' GPS target':' synth shell'), cx-r, cy-r-12);
+}
+
+function seeded(body, salt=0){
+  const key=(solarByKey[body]?.key||body||'body')+':'+salt;
+  let h=2166136261>>>0;
+  for(let i=0;i<key.length;i++){ h^=key.charCodeAt(i); h=Math.imul(h,16777619); }
+  return mulberry32(h>>>0);
+}
+function orbitBlueprint(body){
+  const b=solarByKey[body]||solarByKey.earth;
+  const knownMoons=[];
+  const provenObjects=[];
+  if(body==='earth'){
+    knownMoons.push({id:'moon',name:'Moon', ring:0.88, size:9, color:'#d9dde6', kind:'natural moon'});
+    provenObjects.push({id:'moon',name:'Moon', ring:0.88, angleOffset:0.0, size:9, tint:'#d9dde6', role:'natural moon', source:'NASA/JPL'});
+    provenObjects.push({id:'iss',name:'ISS',ring:0.44,angleOffset:0.4,size:4.2,tint:'#e6f2ff',role:'space station',source:'NASA', epoch:'2026-03 sample'});
+    provenObjects.push({id:'hubble',name:'Hubble',ring:0.50,angleOffset:2.2,size:3.4,tint:'#d7e5ff',role:'space telescope',source:'NASA/ESA', epoch:'2026-03 sample'});
+    provenObjects.push({id:'landsat9',name:'Landsat 9',ring:0.58,angleOffset:4.0,size:3.0,tint:'#b7f4d2',role:'earth observation',source:'NASA/USGS'});
+    provenObjects.push({id:'goes_east',name:'GOES East',ring:0.82,angleOffset:1.3,size:3.2,tint:'#ffd7a8',role:'weather satellite',source:'NOAA/NASA'});
+  }
+
+  if(body==='moon'){
+    provenObjects.push({id:'lro',name:'LRO',ring:0.46,angleOffset:1.0,size:3.0,tint:'#eef6ff',role:'lunar orbiter',source:'NASA', epoch:'2026-03 sample'});
+    provenObjects.push({id:'capstone',name:'CAPSTONE',ring:0.92,angleOffset:2.8,size:2.6,tint:'#d8e6ff',role:'lunar orbiter',source:'NASA/Advanced Space', epoch:'2026-03 sample'});
+  }
+  if(body==='mars'){
+    [{id:'phobos',name:'Phobos',ring:0.48,size:4,color:'#d7c0af'},{id:'deimos',name:'Deimos',ring:0.66,size:3,color:'#b8a89d'}].forEach(m=>{ knownMoons.push({...m,kind:'natural moon'}); provenObjects.push({id:m.id,name:m.name,ring:m.ring,angleOffset:provenObjects.length*1.6,size:m.size,tint:m.color,role:'natural moon',source:'NASA/JPL'}); });
+    provenObjects.push({id:'mro',name:'MRO',ring:0.42,angleOffset:0.4,size:3.2,tint:'#eef4ff',role:'mars orbiter',source:'NASA', epoch:'2026-03 sample'});
+    provenObjects.push({id:'odyssey',name:'Odyssey',ring:0.56,angleOffset:1.8,size:3.0,tint:'#dbe8ff',role:'mars orbiter',source:'NASA', epoch:'2026-03 sample'});
+    provenObjects.push({id:'maven',name:'MAVEN',ring:0.72,angleOffset:3.1,size:3.1,tint:'#c7ecff',role:'mars orbiter',source:'NASA', epoch:'2026-03 sample'});
+  }
+  if(body==='jupiter'){
+    [{id:'io',name:'Io',ring:0.54,size:4,color:'#f4d27a'},{id:'europa',name:'Europa',ring:0.65,size:4.5,color:'#dce8ff'},{id:'ganymede',name:'Ganymede',ring:0.76,size:5,color:'#bbb7a7'},{id:'callisto',name:'Callisto',ring:0.87,size:5.5,color:'#82776c'}].forEach((m,i)=>{ knownMoons.push({...m,kind:'Galilean moon'}); provenObjects.push({id:m.id,name:m.name,ring:m.ring,angleOffset:i*1.35,size:m.size,tint:m.color,role:'natural moon',source:'NASA/JPL'}); });
+    provenObjects.push({id:'juno',name:'Juno',ring:0.68,angleOffset:2.6,size:3.5,tint:'#ffe8bf',role:'jupiter orbiter',source:'NASA', epoch:'2026-03 sample'});
+  }
+  if(body==='saturn'){
+    [{id:'titan',name:'Titan',ring:0.62,size:5,color:'#d8b57c'},{id:'enceladus',name:'Enceladus',ring:0.72,size:4,color:'#edf4ff'},{id:'rhea',name:'Rhea',ring:0.82,size:4.5,color:'#c7c3cb'}].forEach((m,i)=>{ knownMoons.push({...m,kind:'major moon'}); provenObjects.push({id:m.id,name:m.name,ring:m.ring,angleOffset:i*1.5,size:m.size,tint:m.color,role:'natural moon',source:'NASA/JPL'}); });
+  }
+  (provenOrbitOverrides[body]||[]).forEach(o=>provenObjects.push({...o}));
+  provenObjects.forEach((o,i)=>{ if(!Number.isFinite(o.angleOffset)) o.angleOffset=i*1.23; o.angle = o.angleOffset; if(!o.tint) o.tint='#eef6ff'; if(!o.source) o.source='offline-curated'; });
+  const lanes = provenObjects.map((o,i)=>({name:o.name+' orbit', ring:o.ring, width:0.010+(i%2)*0.003, kind:o.role, color:'rgba(116,198,255,0.86)'}));
+  return {body:b, knownMoons, lanes, objects:provenObjects};
+}
+function drawOrbitBlueprint(bodyName){
+  const body=solarByKey[surfaceBody]||solarByKey.earth;
+  const bp=orbitBlueprint(surfaceBody);
+  const cx=innerWidth*0.5, cy=innerHeight*0.53;
+  const minDim=Math.min(innerWidth,innerHeight);
+  const baseR=minDim*0.11*surfaceZoom;
+  gpsMode=surfaceZoom>=2.4;
+  // orbit grid backdrop
+  for(let i=0;i<3;i++){
+    ctx.strokeStyle='rgba(255,255,255,'+(0.03+i*0.02)+')';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.arc(cx,cy,baseR*(1.45+i*0.42),0,Math.PI*2);
+    ctx.stroke();
+  }
+  // synth planet core
+  const grd=ctx.createRadialGradient(cx-baseR*0.35,cy-baseR*0.4,baseR*0.12,cx,cy,baseR);
+  if(surfaceBody==='earth'){ grd.addColorStop(0,'#74bdff'); grd.addColorStop(.6,'#255fa8'); grd.addColorStop(1,'#0b1e3c'); }
+  else if(surfaceBody==='mars'){ grd.addColorStop(0,'#f4b08d'); grd.addColorStop(.6,'#bc5e3b'); grd.addColorStop(1,'#47211a'); }
+  else if(surfaceBody==='moon'){ grd.addColorStop(0,'#f0f2f6'); grd.addColorStop(.6,'#aeb7c4'); grd.addColorStop(1,'#3d4654'); }
+  else { grd.addColorStop(0,'#f6d7aa'); grd.addColorStop(.6, body.color||'#b8bcc6'); grd.addColorStop(1,'#1a2236'); }
+  ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(cx,cy,baseR,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=Math.max(1.2,baseR*0.03); ctx.beginPath(); ctx.arc(cx,cy,baseR,0,Math.PI*2); ctx.stroke();
+  // synth features
+  const spin = earthSpin*0.7;
+  for(let i=0;i<20;i++){
+    const a=i*0.39 + spin;
+    const ex=baseR*(0.12 + (i%5)*0.04);
+    const x=cx + Math.sin(a*1.6)*baseR*0.52;
+    const y=cy + Math.cos(a*0.9+i*0.2)*baseR*0.38;
+    ctx.fillStyle=surfaceBody==='earth'?'rgba(84,175,101,0.22)':surfaceBody==='mars'?'rgba(110,55,32,0.20)':'rgba(255,255,255,0.09)';
+    ctx.beginPath(); ctx.ellipse(x,y,ex,ex*0.46,Math.sin(a)*0.3,0,Math.PI*2); ctx.fill();
+  }
+  // lanes
+  bp.lanes.forEach((lane,idx)=>{
+    const rr=baseR*(1.15 + lane.ring*surfaceZoom*0.92);
+    ctx.strokeStyle=lane.color.replace('0.95', gpsMode?'0.55':'0.28');
+    ctx.lineWidth=Math.max(1.4,baseR*lane.width*(gpsMode?1.6:1.1));
+    ctx.beginPath(); ctx.ellipse(cx,cy,rr,rr*(0.72+idx*0.015),0,0,Math.PI*2); ctx.stroke();
+  });
+  // rings for saturn
+  if(body.rings){
+    ctx.strokeStyle='rgba(235,212,164,0.65)'; ctx.lineWidth=Math.max(4,baseR*0.18); ctx.beginPath(); ctx.ellipse(cx,cy,baseR*1.75,baseR*0.62,0.08,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=Math.max(1.2,baseR*0.04); ctx.beginPath(); ctx.ellipse(cx,cy,baseR*1.75,baseR*0.62,0.08,0,Math.PI*2); ctx.stroke();
+  }
+  currentBlueprintHitboxes=[];
+  // moons
+  bp.knownMoons.forEach((m,idx)=>{
+    const ang=earthSpin*0.14 + idx*1.7;
+    const rr=baseR*(1.22 + m.ring*surfaceZoom*0.9);
+    const ex=rr*Math.cos(ang), ey=rr*(0.72+idx*0.015)*Math.sin(ang);
+    const mr=m.size*(gpsMode?1.15:1);
+    ctx.fillStyle=m.color; ctx.beginPath(); ctx.arc(cx+ex,cy+ey,mr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(235,243,255,.88)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(m.name,cx+ex+8,cy+ey-6);
+    currentBlueprintHitboxes.push({type:'moon',id:m.id,x:cx+ex,y:cy+ey,r:Math.max(10,mr*2),name:m.name});
+  });
+  // proven orbital objects
+  bp.objects.forEach((o,idx)=>{
+    const ang=o.angle + earthSpin*(0.08 + (idx%5)*0.012);
+    const rr=baseR*(1.08 + o.ring*surfaceZoom*0.88);
+    const x=cx + Math.cos(ang)*rr;
+    const y=cy + Math.sin(ang)*rr*(0.72 + (idx%4)*0.012);
+    const rrObj=o.size*(gpsMode?1.25:1);
+    ctx.fillStyle=o.tint; ctx.beginPath(); ctx.arc(x,y,rrObj,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=selectedBlueprintId===o.id?'rgba(116,198,255,0.85)':'rgba(255,255,255,0.16)'; ctx.lineWidth=selectedBlueprintId===o.id?1.8:1; ctx.beginPath(); ctx.arc(x,y,o.size*(gpsMode?2.6:2.1),0,Math.PI*2); ctx.stroke();
+    currentBlueprintHitboxes.push({type:'object',id:o.id,x,y,r:Math.max(10,rrObj*2),name:o.name});
+  });
+  // aim crosshair
+  ctx.strokeStyle='rgba(235,243,255,.85)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(pointer.x-10,pointer.y); ctx.lineTo(pointer.x+10,pointer.y); ctx.moveTo(pointer.x,pointer.y-10); ctx.lineTo(pointer.x,pointer.y+10); ctx.stroke();
+  // labels
+  ctx.fillStyle='rgba(235,243,255,.95)'; ctx.font='12px Inter, sans-serif';
+  ctx.fillText('PROVEN ORBIT VIEW  '+body.name.toUpperCase()+'  traces '+bp.lanes.length+'  objects '+bp.objects.length+'  moons '+bp.knownMoons.length, cx-baseR*1.45, cy-baseR*1.38);
+  ctx.fillText((gpsMode?'TIGHT':'WIDE')+' ORBIT SHELL  radius '+fmt(body.radiusKm,1)+' km  orbit zoom '+fmt(surfaceZoom,2)+'×', cx-baseR*1.45, cy+baseR*1.44);
+}
+function selectedStats(){
+  if(scope==='universe'){ const g=galaxyByKey[selectedKey]||galaxyByKey.milkyway; return [['Type',g.type],['Distance',fmt(g.distMly,2)+' million ly'],['Render size',fmt(g.size,2)],['Catalog key',g.key],['Known shell', g.key==='milkyway'?'primary galaxy':'survey/curated']]; }
+  if(scope==='milkyway'){ const h=hostByKey[selectedKey]||hostByKey.proxima; return [['Distance',fmt(h.distLy,2)+' ly'],['Star temp',fmt(h.temp,0)+' K'],['Planets',h.planets],['Arm radius',fmt(h.r,3)],['Catalog key',h.key]]; }
+  if(scope==='solar'){ const b=solarByKey[selectedKey]||solarByKey.earth; const p=keplerPos(b,simDays); return [['Type',b.type],['Radius',fmt(b.radiusKm,1)+' km'],['Semi-major axis',fmt(b.aAU,6)+' AU'],['Eccentricity',fmt(b.e,4)],['Orbital period',fmt(b.periodDays,2)+' days'],['Current heliocentric distance',fmt(p.rAU||0,6)+' AU']]; }
+  const b=solarByKey[surfaceBody]||solarByKey.earth; const sel=currentBlueprintSelection(surfaceBody); const bp=orbitBlueprint(surfaceBody); const rows=[['Orbit body',b.name],['Orbit zoom',fmt(surfaceZoom,2)+'×'],['Primary moon count', bp.knownMoons.length],['Proven orbit traces', bp.lanes.length],['Curated proven objects', bp.objects.length],['Selected object', sel?sel.name:'none']]; if(sel){ rows.push(['Selected role', sel.role||sel.kind||'object']); rows.push(['Selected source', sel.source||'curated']); rows.push(['Selected epoch', sel.epoch||'unspecified']); } return rows;
+}
+function updateUI(force=false){ if(!force && !uiDirty) return; uiDirty=false; updateHudLayout(); const rows=selectedStats(); stats.innerHTML=''; for(const [k,v] of rows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; stats.appendChild(a); stats.appendChild(b); }
+  engineStats.innerHTML=''; const erows=[['Scope',scope],['Selected',getSelectedName()||'none'],['Camera zoom',scope==='surface'?fmt(surfaceZoom,2)+'×':fmt(camera.zoom,2)+'×'],['Aim zoom','pointer-anchored target descent'],['Galaxy count',galaxies.length],['Host count',hosts.length],['Bodies',solarBodies.length],['Orbit body',surfaceBody],['Orbit mode', gpsMode?'tight proven shell':'wide proven shell'],['Imported packs', importedCatalogMeta.length],['Last validation', importedCatalogMeta.at(-1)?.validation?.ok ? 'ok' : (importedCatalogMeta.at(-1)?.validation ? 'issues' : 'none')]]; for(const [k,v] of erows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; engineStats.appendChild(a); engineStats.appendChild(b); }
+  sourceStats.innerHTML=''; const lastPack=importedCatalogMeta.at(-1); const srows = scope==='solar' || scope==='surface' ? [['Orbit truth',dataSources.solar],['Body sizes',dataSources.sizes],['Imported packs', importedCatalogMeta.length],['Last pack', lastPack?lastPack.name:'none'],['Orbit shell', gpsMode?'tight proven orbital shell':'curated proven orbit shell']] : scope==='milkyway' ? [['Host shell',dataSources.exoplanets],['Starfield shell',dataSources.milkyway],['Imported packs', importedCatalogMeta.length],['Last pack', lastPack?lastPack.name:'none'],['Known limitation','offline curated named host subset only']] : [['Galaxy shell',dataSources.galaxies],['Milky Way node','curated primary anchor'],['Imported packs', importedCatalogMeta.length],['Last pack', lastPack?lastPack.name:'none'],['Known limitation','offline named galaxy subset only']]; for(const [k,v] of srows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; sourceStats.appendChild(a); sourceStats.appendChild(b); }
+  truthPath.innerHTML=''; const pathRows = scope==='universe' ? [['Graph path','Universe → '+(galaxyByKey[selectedKey]?.name||'Milky Way')],['Target node',selectedKey],['Render tier','galaxy-shell'],['Truth mode','named real galaxies only']] : scope==='milkyway' ? [['Graph path','Milky Way → '+(hostByKey[selectedKey]?.name||'host')],['Target node',selectedKey],['Render tier','host-shell'],['Truth mode','named proven hosts only']] : scope==='solar' ? [['Graph path','Solar System → '+(solarByKey[selectedKey]?.name||'body')],['Target node',selectedKey],['Render tier','synth-body'],['Truth mode','analytic orbit + compressed render']] : [['Graph path',(solarByKey[surfaceBody]?.name||'Body')+' → proven orbit shell'],['Target node',surfaceBody],['Render tier',gpsMode?'tight proven orbit':'wide proven orbit'],['Truth mode','analytic body truth + curated proven orbital objects']]; for(const [k,v] of pathRows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; truthPath.appendChild(a); truthPath.appendChild(b); }
+  const selObj=currentBlueprintSelection(surfaceBody); blueprintStats.innerHTML=''; [['Selection',selObj?selObj.name:'none'],['Role',selObj?(selObj.role||selObj.kind||'object'):'—'],['Source',selObj?(selObj.source||'offline-curated'):'—'],['Orbit ring',selObj&&selObj.ring!=null?fmt(selObj.ring,2):'—']].forEach(([k,v])=>{ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; blueprintStats.appendChild(a); blueprintStats.appendChild(b); });
+  const now=new Date(epoch.getTime()+simDays*86400000); epochLabel.textContent=now.toISOString(); speedLabel.textContent=(scope==='surface'?'proven orbit mode':fmt(simDays,2)+' sim days / sec'); if(pathPill) pathPill.textContent=(pathRows[0]?.[1]||selectedKey);
+  panelTitle.textContent = ({universe:'Universe',milkyway:'Milky Way',solar:'Star System',surface:(solarByKey[surfaceBody]?.name||'Planet')+' Proven Orbit View'})[scope];
+  validateGlobalTruth();
+  panelDesc.textContent = scope==='universe' ? 'Named real galaxy subset with explicit truth/render separation. Use wheel zoom to descend toward your aimed target.' : scope==='milkyway' ? 'Named proven host-system shell only. Synthetic host density has been removed in this truth-locked build.' : scope==='solar' ? 'Analytic heliocentric solver for the Sun, planets, Moon, and Pluto using authored orbital fields. Descend into Proven Orbit View to inspect real moons and curated proven orbital objects.' : 'Local 2D-but-visually-3D proven orbit view. The selected body stays synth-rendered while only proven orbital objects are shown around it, whether bundled in the base build or imported from validated external truth packs.';
+}
+canvas.addEventListener('pointerdown',e=>{ pointer.x=e.clientX; pointer.y=e.clientY; drag={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); pickObject(e.clientX,e.clientY); markUiDirty(); });
+canvas.addEventListener('pointermove',e=>{ pointer.x=e.clientX; pointer.y=e.clientY; if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag={x:e.clientX,y:e.clientY}; if(scope==='surface'){ targetLon = ((targetLon - dx*0.18 + 540)%360)-180; targetLat = clamp(targetLat + dy*0.08,-85,85); } else { const scale=currentScale(); camera.x -= dx/scale; camera.y -= dy/scale; } markUiDirty(); });
+canvas.addEventListener('pointerup',()=>{drag=null; saveState(); markUiDirty();}); canvas.addEventListener('pointercancel',()=>{drag=null; saveState(); markUiDirty();});
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); pointer.x=e.clientX; pointer.y=e.clientY; zoomStep(e.deltaY<0?1:-1,e.clientX,e.clientY); saveState(); markUiDirty(); }, {passive:false});
+window.addEventListener('keydown',e=>{ if(e.key===' ') { e.preventDefault(); pauseBtn.click(); } else if(e.key==='Enter') descend(); else if(e.key==='Backspace'){ e.preventDefault(); ascend(); } else if(e.key==='1') setScope('universe'); else if(e.key==='2') setScope('milkyway'); else if(e.key==='3') setScope('solar'); else if(e.key==='4') setScope('surface'); else if(e.key==='[') { timeSlider.value=Math.max(-6, +timeSlider.value-1); timeSlider.oninput(); } else if(e.key===']'){ timeSlider.value=Math.min(8, +timeSlider.value+1); timeSlider.oninput(); } else if(e.key.toLowerCase()==='f') focusSelected(); else if(e.key.toLowerCase()==='n'){ if(scope==='surface') logCatalog('truth mode locked: add disabled'); } else if(e.key.toLowerCase()==='x'){ if(scope==='surface') logCatalog('truth mode locked: remove disabled'); } else if(e.key.toLowerCase()==='v'){ if(scope==='surface') validateCurrentBlueprint(surfaceBody); } });
+function pickObject(mx,my,forceNearest=false){ let best=null,bestD=1e9; if(scope==='universe'){ for(const g of galaxies){ const p=projectUniverse(g.x,g.y), d=Math.hypot(mx-p.x,my-p.y); if(d<bestD && (forceNearest || d<36)){ best=g.key; bestD=d; } } } else if(scope==='milkyway'){ const count=camera.zoom<1.5?500:camera.zoom<2.8?900:hosts.length; for(let i=0;i<count;i++){ const h=hosts[i], p=projectMilky(h.x,h.y), d=Math.hypot(mx-p.x,my-p.y); if(d<bestD && (forceNearest || d<18)){ best=h.key; bestD=d; } } } else if(scope==='solar'){ for(const b of solarBodies){ const p=keplerPos(b,simDays), pp=projectSolar(p.x*10,p.y*10), d=Math.hypot(mx-pp.x,my-pp.y); if(d<bestD && (forceNearest || d<22)){ best=b.key; bestD=d; } } } else if(scope==='surface'){ for(const h of currentBlueprintHitboxes){ const d=Math.hypot(mx-h.x,my-h.y); if(d<bestD && (forceNearest || d<h.r)){ best=h; bestD=d; } } if(best){ if(best.type==='object'){ selectedBlueprintId=best.id; } else { selectedBlueprintId=''; selectedKey=best.id; } saveState(); return best.id; } return null; } if(best){ selectedKey=best; focusSel.value=selectedKey; return best; } return null; }
+function ensureBundledTruthLoaded(){ if(autoBootLoaded) return; autoBootLoaded=true; if(importedCatalogMeta.length>0) return; loadBundledTruthPacks(); logCatalog('auto-loaded bundled proven truth packs for offline boot'); markUiDirty(); }
+function maybeUpdateUi(ts){ if(uiDirty || (ts-lastUiAt)>=uiIntervalMs){ updateUI(true); lastUiAt=ts; } }
+function frame(ts=0){ requestAnimationFrame(frame); if(!paused && scope!=='surface'){ earthSpin += 0.015; } if(!paused && scope!=='surface') simDays += (Number(timeSlider.value)>=0?Math.pow(2,Number(timeSlider.value)):-Math.pow(2,Math.abs(Number(timeSlider.value))))/60; bg(); if(scope==='universe') drawUniverse(); else if(scope==='milkyway') drawMilky(); else if(scope==='solar') drawSolar(); else drawOrbitBlueprint(solarByKey[surfaceBody]?.name||'Earth'); maybeUpdateUi(ts); }
+populateFocus();
+loadState();
+ensureBundledTruthLoaded();
+focusSel.value=selectedKey;
+updateHudLayout();
+rebuildBgLayer();
+markUiDirty();
+frame();
+})();
+</script>
+</body>
+</html>

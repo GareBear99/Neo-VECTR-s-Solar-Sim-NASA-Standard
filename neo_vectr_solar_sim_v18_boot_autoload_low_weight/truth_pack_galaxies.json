@@ -1,0 +1,30 @@
+[
+  {
+    "type": "galaxy",
+    "proven": true,
+    "key": "whirlpool",
+    "name": "Whirlpool Galaxy",
+    "distMly": 31,
+    "size": 0.34,
+    "x": 10.4,
+    "y": 2.0,
+    "color": "#ffd39d",
+    "galaxyType": "spiral",
+    "source": "NED (curated subset)",
+    "epoch": "2026-03 curated"
+  },
+  {
+    "type": "galaxy",
+    "proven": true,
+    "key": "cartwheel",
+    "name": "Cartwheel Galaxy",
+    "distMly": 500,
+    "size": 0.42,
+    "x": -24.0,
+    "y": 3.2,
+    "color": "#bfe3ff",
+    "galaxyType": "lenticular ring",
+    "source": "NED (curated subset)",
+    "epoch": "2026-03 curated"
+  }
+]

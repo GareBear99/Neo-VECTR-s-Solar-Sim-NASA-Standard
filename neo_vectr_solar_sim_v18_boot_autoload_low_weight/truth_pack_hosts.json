@@ -1,0 +1,41 @@
+[
+  {
+    "type": "host",
+    "proven": true,
+    "key": "proxima",
+    "name": "Proxima Centauri",
+    "distLy": 4.2465,
+    "temp": 3042,
+    "planets": 2,
+    "theta": 0.12,
+    "r": 0.14,
+    "source": "NASA Exoplanet Archive (curated subset)",
+    "epoch": "2026-03 curated"
+  },
+  {
+    "type": "host",
+    "proven": true,
+    "key": "trappist1",
+    "name": "TRAPPIST-1",
+    "distLy": 39.5,
+    "temp": 2559,
+    "planets": 7,
+    "theta": 0.58,
+    "r": 0.24,
+    "source": "NASA Exoplanet Archive (curated subset)",
+    "epoch": "2026-03 curated"
+  },
+  {
+    "type": "host",
+    "proven": true,
+    "key": "toi700",
+    "name": "TOI-700",
+    "distLy": 101.4,
+    "temp": 3480,
+    "planets": 4,
+    "theta": 2.16,
+    "r": 0.37,
+    "source": "NASA Exoplanet Archive (curated subset)",
+    "epoch": "2026-03 curated"
+  }
+]

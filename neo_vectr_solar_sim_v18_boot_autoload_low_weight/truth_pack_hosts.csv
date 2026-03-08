@@ -1,0 +1,4 @@
+type,proven,key,name,distLy,temp,planets,theta,r,source,epoch
+host,True,proxima,Proxima Centauri,4.2465,3042,2,0.12,0.14,NASA Exoplanet Archive (curated subset),2026-03 curated
+host,True,trappist1,TRAPPIST-1,39.5,2559,7,0.58,0.24,NASA Exoplanet Archive (curated subset),2026-03 curated
+host,True,toi700,TOI-700,101.4,3480,4,2.16,0.37,NASA Exoplanet Archive (curated subset),2026-03 curated

@@ -1,0 +1,44 @@
+[
+  {
+    "type": "orbit",
+    "proven": true,
+    "body": "earth",
+    "id": "iss",
+    "name": "ISS",
+    "ring": 0.46,
+    "angleOffset": 0.2,
+    "size": 4.5,
+    "tint": "#d8ecff",
+    "role": "space station",
+    "source": "NASA",
+    "epoch": "2026-03 curated"
+  },
+  {
+    "type": "orbit",
+    "proven": true,
+    "body": "earth",
+    "id": "hubble",
+    "name": "Hubble",
+    "ring": 0.5,
+    "angleOffset": 2.1,
+    "size": 3.6,
+    "tint": "#c8d8ff",
+    "role": "space telescope",
+    "source": "NASA/ESA",
+    "epoch": "2026-03 curated"
+  },
+  {
+    "type": "orbit",
+    "proven": true,
+    "body": "mars",
+    "id": "mro",
+    "name": "MRO",
+    "ring": 0.44,
+    "angleOffset": 0.6,
+    "size": 3.2,
+    "tint": "#e9f1ff",
+    "role": "orbiter",
+    "source": "NASA",
+    "epoch": "2026-03 curated"
+  }
+]

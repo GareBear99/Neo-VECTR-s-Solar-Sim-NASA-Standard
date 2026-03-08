@@ -1,0 +1,3 @@
+type,proven,key,name,distMly,size,x,y,color,galaxyType,source,epoch
+galaxy,True,whirlpool,Whirlpool Galaxy,31,0.34,10.4,2.0,#ffd39d,spiral,NED (curated subset),2026-03 curated
+galaxy,True,cartwheel,Cartwheel Galaxy,500,0.42,-24.0,3.2,#bfe3ff,lenticular ring,NED (curated subset),2026-03 curated

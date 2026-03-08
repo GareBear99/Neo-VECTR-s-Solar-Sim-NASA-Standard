@@ -1,0 +1,4 @@
+type,proven,body,id,name,size,ring,angleOffset,tint,role,source,epoch
+orbit,True,earth,iss,ISS,4.5,0.46,0.2,#d8ecff,space station,NASA,2026-03 curated
+orbit,True,earth,hubble,Hubble,3.6,0.5,2.1,#c8d8ff,space telescope,NASA/ESA,2026-03 curated
+orbit,True,mars,mro,MRO,3.2,0.44,0.6,#e9f1ff,orbiter,NASA,2026-03 curated
