@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Neo-VECTR's Solar Sim v7</title>
+<style>
+:root{
+  --bg:#03050b; --panel:rgba(7,11,24,.84); --line:rgba(116,198,255,.16); --text:#eef6ff; --muted:#a9bed8;
+  --accent:#74c6ff; --accent2:#d58cff; --good:#89f2c8; --warn:#ffbf78; --danger:#ff7f86;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 28%, #09122a 0%, #03050b 64%, #010205 100%);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+.hud{position:fixed;z-index:3;backdrop-filter:blur(12px);background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 36px rgba(0,0,0,.35)}
+:root{--hud-gap:12px;--topbar-h:64px;--footer-h:58px;--left-w:min(410px,calc(100vw - 24px));--right-w:min(380px,calc(100vw - 24px));--side-top:calc(var(--hud-gap) * 2 + var(--topbar-h));--side-max-h:calc(100vh - var(--side-top) - var(--footer-h) - (var(--hud-gap) * 2));}
+#topbar{left:12px;top:12px;right:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+#topbar .group, #footer .group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#left,#right{top:var(--side-top);padding:14px;max-height:max(220px,var(--side-max-h));overflow:auto}
+#left{left:12px;width:var(--left-w)}
+#right{right:12px;width:var(--right-w)}
+#footer{left:12px;right:12px;bottom:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+body.stack-panels #left{left:12px;right:12px;width:min(430px,calc(100vw - 24px));top:var(--side-top)}
+body.stack-panels #right{left:12px;right:12px;width:min(430px,calc(100vw - 24px));top:calc(var(--side-top) + min(46vh, 380px));max-height:calc(100vh - (var(--side-top) + min(46vh, 380px)) - var(--footer-h) - (var(--hud-gap) * 2));}
+body.stack-panels #left{max-height:min(42vh, 340px)}
+.pill{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
+button,select,input,textarea{font:inherit}
+button,select,input[type="text"],input[type="range"]{accent-color:var(--accent)}
+button,select,input[type="text"]{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:8px 10px}
+button:hover,select:hover,input[type="text"]:hover{border-color:rgba(116,198,255,.34)}
+button{cursor:pointer}
+h1{font-size:18px;margin:0 0 8px} h2{font-size:14px;color:var(--accent);margin:0 0 8px} p,li{font-size:13px;color:var(--muted);line-height:1.44}
+.section+.section{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:8px 10px;font-size:12px;color:var(--muted)}
+.kv div:nth-child(2n){text-align:right;color:var(--text)}
+.legend{display:grid;grid-template-columns:12px 1fr;gap:8px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.dot{width:12px;height:12px;border-radius:999px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:1px 6px;border-radius:8px;color:var(--text)}
+.small{font-size:11px;color:var(--muted)} .good{color:var(--good)} .warn{color:var(--warn)} .danger{color:var(--danger)}
+.stack{display:grid;gap:8px} .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#catalogLog{white-space:pre-wrap;font-size:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px;max-height:160px;overflow:auto}
+input[type="range"]{width:100%}
+@media (max-width: 860px){ body{overflow:auto} canvas{position:absolute;height:62vh} #topbar,#left,#right,#footer{position:static;margin:10px;width:auto;max-height:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="topbar" class="hud">
+  <div class="group">
+    <strong>Neo-VECTR's Solar Sim v7</strong>
+    <span class="pill">Unified graph spine · Galaxy → Milky Way → Star System → Planet Surface</span>
+    <span class="pill">Aim-target zoom + source-backed truth metadata + GPS descent</span>
+    <span class="pill">2D but visually 3D</span>
+  </div>
+  <div class="group">
+    <button id="pauseBtn">Pause</button>
+    <button id="resetBtn">Reset view</button>
+    <button id="inBtn">Zoom in</button>
+    <button id="outBtn">Zoom out</button>
+    <select id="scopeSel">
+      <option value="universe">Universe</option>
+      <option value="milkyway">Milky Way</option>
+      <option value="solar">Star System</option>
+      <option value="surface">Planet Surface</option>
+    </select>
+    <select id="focusSel"></select>
+  </div>
+</div>
+<div id="left" class="hud">
+  <h1 id="panelTitle">Universe</h1>
+  <p id="panelDesc">This build tightens aim-target zoom, keeps astronomy truth separate from render compression, and surfaces source metadata directly in the UI.</p>
+  <div class="section">
+    <h2 id="statsHeading">Selection</h2>
+    <div id="stats" class="kv"></div>
+  </div>
+  <div class="section">
+    <h2>Navigation</h2>
+    <p><code>Wheel</code> zoom · <code>Drag</code> pan / rotate · <code>Click</code> select · <code>Enter</code> descend · <code>Backspace</code> ascend · <code>1-4</code> force layer · <code>Space</code> pause · <code>[ ]</code> speed · <code>F</code> focus selected</p>
+    <p class="small">Wheel zoom now pulls the camera toward your aim point. Surface mode stays synth-first until close enough to flip into GPS-style tile guidance.</p>
+  </div>
+  <div class="section">
+    <h2>Search / bookmarks</h2>
+    <div class="stack">
+      <input id="searchBox" type="text" placeholder="Search object… e.g. Earth, Andromeda, TRAPPIST-1"/>
+      <div class="row"><button id="searchBtn">Find</button><button id="bookmarkBtn">Bookmark selected</button><select id="bookmarkSel"><option value="">Jump to bookmark…</option></select></div>
+      <p class="small">Bookmarks are local to this HTML file session.</p>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Legend</h2>
+    <div class="legend">
+      <div class="dot" style="background:#ffd166"></div><div>Spiral / warm stellar population</div>
+      <div class="dot" style="background:#b9d3ff"></div><div>Elliptical / older population</div>
+      <div class="dot" style="background:#8cf0c6"></div><div>Milky Way host systems</div>
+      <div class="dot" style="background:#67a8ff"></div><div>Earth / oceanic world</div>
+      <div class="dot" style="background:#ff7c57"></div><div>Rocky / warm worlds</div>
+      <div class="dot" style="background:#d9b57c"></div><div>Gas giants</div>
+    </div>
+  </div>
+</div>
+<div id="right" class="hud">
+  <div class="section" style="padding-top:0;border-top:0">
+    <h2>Engine</h2>
+    <div id="engineStats" class="kv"></div>
+  </div>
+  <div class="section">
+    <h2>Accuracy / sources</h2>
+    <div id="sourceStats" class="kv"></div>
+    <p class="small">Truth fields are authored from public astronomy references and kept separate from render compression. Visual scale, glow, and synth shells are presentation layers only.</p>
+  </div>
+  <div class="section">
+    <h2>Time scale</h2>
+    <input id="timeSlider" type="range" min="-6" max="8" step="1" value="3"/>
+    <p class="small">Universe and Milky Way layers use cinematic drift only. Star-system mode uses analytic orbit motion in sim days/sec. Surface mode freezes orbital time by default.</p>
+  </div>
+  <div class="section">
+    <h2>Catalog ingest scaffold</h2>
+    <div class="stack">
+      <div class="row"><button id="sampleBtn">Load extra sample hosts</button><input id="catalogFile" type="file" accept=".json,.csv"/></div>
+      <p class="small">Accepted JSON arrays: <code>{"name","distLy","temp","planets","theta","r"}</code> for Milky Way hosts, or <code>{"name","x","y","size","type"}</code> for galaxies. CSV headers supported with the same field names.</p>
+      <div id="catalogLog">ready</div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Surface target</h2>
+    <div class="row"><button data-preset="earth">Earth</button><button data-preset="moon">Moon</button><button data-preset="mars">Mars</button></div>
+    <p class="small">Surface mode currently ships textured Earth. Moon and Mars share the same local renderer path and placeholder palette until their map layers are authored.</p>
+  </div>
+</div>
+<div id="footer" class="hud">
+  <div class="group"><span id="status">Running</span><span class="pill" id="epochLabel"></span><span class="pill" id="speedLabel"></span></div>
+  <div class="group"><span class="pill" id="modePill">Universe layer</span></div>
+</div>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d',{alpha:false});
+const $=id=>document.getElementById(id);
+const pauseBtn=$('pauseBtn'),resetBtn=$('resetBtn'),inBtn=$('inBtn'),outBtn=$('outBtn'),scopeSel=$('scopeSel'),focusSel=$('focusSel');
+const panelTitle=$('panelTitle'),panelDesc=$('panelDesc'),stats=$('stats'),engineStats=$('engineStats'),sourceStats=$('sourceStats'),epochLabel=$('epochLabel'),speedLabel=$('speedLabel'),status=$('status'),modePill=$('modePill'),timeSlider=$('timeSlider');
+const searchBox=$('searchBox'),searchBtn=$('searchBtn'),bookmarkBtn=$('bookmarkBtn'),bookmarkSel=$('bookmarkSel'),catalogLog=$('catalogLog'),catalogFile=$('catalogFile'),sampleBtn=$('sampleBtn');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)); const lerp=(a,b,t)=>a+(b-a)*t; const DEG=Math.PI/180; const AU_KM=149597870.7;
+const epoch=new Date('2000-01-01T12:00:00Z');
+const dataSources={solar:'JPL / NASA orbital elements (authored static reference set in this offline build)',sizes:'NASA Solar System body radii (authored static reference set)',exoplanets:'NASA Exoplanet Archive style host shell scaffold',milkyway:'Gaia-inspired host distribution shell',galaxies:'Curated Local Group + survey-style extragalactic shell'};
+function updateHudLayout(){ const root=document.documentElement; const topH=Math.ceil(($('topbar')?.offsetHeight||64)); const footH=Math.ceil(($('footer')?.offsetHeight||58)); root.style.setProperty('--topbar-h', topH+'px'); root.style.setProperty('--footer-h', footH+'px'); const leftW=Math.min(410, Math.max(260, innerWidth-24)); const rightW=Math.min(380, Math.max(260, innerWidth-24)); root.style.setProperty('--left-w', leftW+'px'); root.style.setProperty('--right-w', rightW+'px'); const needsHorizontalStack = innerWidth < (leftW + rightW + 64); const availableH = innerHeight - (topH + footH + 48); const needsVerticalStack = availableH < 420; document.body.classList.toggle('stack-panels', needsHorizontalStack || needsVerticalStack); }
+window.addEventListener('resize',()=>setTimeout(updateHudLayout,0)); setTimeout(updateHudLayout,0);
+function resize(){const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));canvas.width=Math.floor(innerWidth*dpr);canvas.height=Math.floor(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0);} window.addEventListener('resize',resize); resize();
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+const rng=mulberry32(1337);
+const solarBodies=[
+  {key:'sun',name:'Sun',type:'star',color:'#ffd166',radiusKm:696340,aAU:0,e:0,iDeg:0,OmegaDeg:0,omegaDeg:0,L0Deg:0,periodDays:1,tiltDeg:7.25,spinHours:609.12,desc:'Central star.'},
+  {key:'mercury',name:'Mercury',type:'planet',color:'#b8bcc6',radiusKm:2439.7,aAU:0.38709893,e:0.20563069,iDeg:7.00487,OmegaDeg:48.33167,omegaDeg:29.12478,L0Deg:252.25084,periodDays:87.9691,tiltDeg:0.034,spinHours:1407.6,desc:'Innermost rocky planet.'},
+  {key:'venus',name:'Venus',type:'planet',color:'#d8a15b',radiusKm:6051.8,aAU:0.72333199,e:0.00677323,iDeg:3.39471,OmegaDeg:76.68069,omegaDeg:54.85229,L0Deg:181.97973,periodDays:224.701,tiltDeg:177.36,spinHours:-5832.5,desc:'Retrograde warm world.'},
+  {key:'earth',name:'Earth',type:'planet',color:'#67a8ff',radiusKm:6371,aAU:1.00000011,e:0.01671022,iDeg:0.00005,OmegaDeg:-11.26064,omegaDeg:114.20783,L0Deg:100.46435,periodDays:365.256,tiltDeg:23.439,spinHours:23.9345,desc:'Primary surface-entry target.'},
+  {key:'moon',name:'Moon',type:'moon',color:'#d9dde6',radiusKm:1737.4,parent:'earth',aAU:384400/AU_KM,e:0.0549,iDeg:5.145,OmegaDeg:125.08,omegaDeg:318.15,L0Deg:218.316,periodDays:27.321661,tiltDeg:6.68,spinHours:655.728,desc:'Earth satellite.'},
+  {key:'mars',name:'Mars',type:'planet',color:'#ff7c57',radiusKm:3389.5,aAU:1.52366231,e:0.09341233,iDeg:1.85061,OmegaDeg:49.57854,omegaDeg:286.4623,L0Deg:355.45332,periodDays:686.98,tiltDeg:25.19,spinHours:24.6229,desc:'Red world.'},
+  {key:'jupiter',name:'Jupiter',type:'planet',color:'#d9b57c',radiusKm:69911,aAU:5.20336301,e:0.04839266,iDeg:1.30530,OmegaDeg:100.55615,omegaDeg:273.8777,L0Deg:34.40438,periodDays:4332.589,tiltDeg:3.13,spinHours:9.925,desc:'Largest planet.'},
+  {key:'saturn',name:'Saturn',type:'planet',color:'#e2c78d',radiusKm:58232,aAU:9.53707032,e:0.05415060,iDeg:2.48446,OmegaDeg:113.71504,omegaDeg:339.392,L0Deg:49.94432,periodDays:10759.22,tiltDeg:26.73,spinHours:10.656,rings:true,desc:'Ringed gas giant.'},
+  {key:'uranus',name:'Uranus',type:'planet',color:'#8fd9ff',radiusKm:25362,aAU:19.19126393,e:0.04716771,iDeg:0.76986,OmegaDeg:74.22988,omegaDeg:96.998857,L0Deg:313.23218,periodDays:30688.5,tiltDeg:97.77,spinHours:-17.24,desc:'Ice giant.'},
+  {key:'neptune',name:'Neptune',type:'planet',color:'#4ea1ff',radiusKm:24622,aAU:30.06896348,e:0.00858587,iDeg:1.76917,OmegaDeg:131.72169,omegaDeg:272.8461,L0Deg:304.88003,periodDays:60182,tiltDeg:28.32,spinHours:16.11,desc:'Outer giant.'},
+  {key:'pluto',name:'Pluto',type:'dwarf planet',color:'#c7b08b',radiusKm:1188.3,aAU:39.48168677,e:0.24880766,iDeg:17.14175,OmegaDeg:110.30347,omegaDeg:113.76329,L0Deg:238.92881,periodDays:90560,tiltDeg:122.53,spinHours:-153.2928,desc:'Dwarf world.'}
+];
+const solarByKey=Object.fromEntries(solarBodies.map(b=>[b.key,b]));
+const galaxies=[
+  {key:'milkyway',name:'Milky Way',type:'barred spiral',color:'#ffd166',distMly:0,size:1.0,x:0,y:0},
+  {key:'andromeda',name:'Andromeda',type:'spiral',color:'#e2ceff',distMly:2.54,size:1.12,x:2.4,y:-0.6},
+  {key:'triangulum',name:'Triangulum',type:'spiral',color:'#ffd89c',distMly:3.0,size:0.56,x:3.0,y:-0.12},
+  {key:'lmc',name:'Large Magellanic Cloud',type:'irregular',color:'#9fe7ff',distMly:0.163,size:0.22,x:-0.75,y:0.48},
+  {key:'smc',name:'Small Magellanic Cloud',type:'irregular',color:'#85d6ff',distMly:0.20,size:0.14,x:-0.95,y:0.73},
+  {key:'m81',name:'Bode\'s Galaxy',type:'spiral',color:'#ffd39d',distMly:11.8,size:0.36,x:5.2,y:1.6},
+  {key:'m82',name:'Cigar Galaxy',type:'starburst',color:'#ffb48a',distMly:11.9,size:0.24,x:5.35,y:1.82},
+  {key:'sombrero',name:'Sombrero Galaxy',type:'spiral',color:'#f2d0ac',distMly:31.1,size:0.28,x:11.2,y:-2.2},
+  {key:'centaurusA',name:'Centaurus A',type:'lenticular',color:'#ffbd8b',distMly:13,size:0.32,x:-4.8,y:-2.6},
+  {key:'m87',name:'Virgo A',type:'elliptical',color:'#c0cfff',distMly:53.5,size:0.50,x:16.2,y:-1.8},
+  {key:'ngc1300',name:'NGC 1300',type:'barred spiral',color:'#fdd69e',distMly:61,size:0.32,x:-18.0,y:1.0}
+];
+for(let i=0;i<120;i++) galaxies.push({key:'g_'+i,name:'Survey galaxy '+(i+1),type:(i%3===0?'spiral':i%3===1?'elliptical':'irregular'),color:i%3===0?'#ffd59f':i%3===1?'#b8d1ff':'#8be4ff',distMly:20+Math.round(rng()*260),size:0.08+rng()*0.18,x:(rng()-0.5)*54,y:(rng()-0.5)*30});
+const galaxyByKey=Object.fromEntries(galaxies.map(g=>[g.key,g]));
+function starColor(temp){ if(temp<3500) return '#ff9b7a'; if(temp<5000) return '#ffd9a8'; if(temp<6200) return '#fff0c7'; if(temp<7500) return '#f8f8ff'; return '#b6d4ff'; }
+const hosts=[];
+const seedHosts=[
+  {key:'proxima',name:'Proxima Centauri',distLy:4.24,temp:3050,planets:2,theta:5.4,r:0.06},
+  {key:'barnard',name:'Barnard\'s Star',distLy:5.96,temp:3200,planets:1,theta:5.7,r:0.08},
+  {key:'trappist1',name:'TRAPPIST-1',distLy:40.7,temp:2550,planets:7,theta:0.55,r:0.16},
+  {key:'tauCeti',name:'Tau Ceti',distLy:11.9,temp:5340,planets:4,theta:0.35,r:0.14},
+  {key:'51peg',name:'51 Pegasi',distLy:50.1,temp:5800,planets:1,theta:2.7,r:0.25},
+  {key:'55cnc',name:'55 Cancri',distLy:41,temp:5200,planets:5,theta:2.95,r:0.22},
+  {key:'toi700',name:'TOI-700',distLy:101,temp:3480,planets:4,theta:4.9,r:0.33},
+  {key:'hd209458',name:'HD 209458',distLy:159,temp:6075,planets:1,theta:3.7,r:0.44},
+  {key:'kepler186',name:'Kepler-186',distLy:582,temp:3750,planets:5,theta:1.8,r:0.74}
+];
+for(const s of seedHosts) hosts.push({...s});
+for(let i=0;i<1600;i++) hosts.push({key:'host_'+i,name:'Catalog host '+(i+1),distLy:20+Math.round(Math.pow(rng(),1.9)*18000),temp:2800+rng()*4800,planets:1+((rng()*6)|0),theta:rng()*Math.PI*2 + (i%4)*(Math.PI/2),r:0.04+Math.pow(rng(),1.3)*0.95,anonymous:true});
+for(const h of hosts){ const armNoise=(Math.sin(h.theta*2.4)+Math.cos(h.theta*1.7))*0.035; h.x=Math.cos(h.theta)*h.r; h.y=Math.sin(h.theta)*(h.r*0.42+armNoise); h.color=starColor(h.temp); }
+const hostByKey=Object.fromEntries(hosts.map(h=>[h.key,h]));
+const extraHostData=[];
+let scope='universe', paused=false, simDays=218.7, earthSpin=0, surfaceZoom=1.0, targetLat=22, targetLon=-75, surfaceBody='earth';
+let selectedKey='milkyway'; const camera={x:0,y:0,zoom:1}; let drag=null; const bookmarks=[]; const pointer={x:innerWidth*0.5,y:innerHeight*0.5}; let gpsMode=false; scopeSel.value=scope;
+
+function currentScale(){ return Math.min(innerWidth,innerHeight)*(scope==='universe'?0.058:scope==='milkyway'?0.44:0.014)*camera.zoom; }
+function screenToWorld(mx,my){ const s=currentScale(); const ay=scope==='universe'?0.55:scope==='milkyway'?0.56:0.55; return {x:camera.x + (mx-innerWidth*0.5)/s, y:camera.y + (my-innerHeight*ay)/s}; }
+function zoomToward(mx,my,dir){
+  if(scope==='surface'){
+    const before={lat:targetLat, lon:targetLon, zoom:surfaceZoom};
+    const cx=innerWidth*0.5, cy=innerHeight*0.53; const r=Math.min(innerWidth,innerHeight)*0.17*surfaceZoom;
+    const nx=clamp((mx-cx)/Math.max(1,r),-1,1); const ny=clamp((my-cy)/Math.max(1,r),-1,1);
+    const worldLon=((Math.asin(nx)/DEG)-targetLon); const worldLat=targetLat-ny*70;
+    surfaceZoom=clamp(surfaceZoom*(dir>0?1.18:1/1.18),0.65,12);
+    const pull=dir>0?0.16:0.08;
+    targetLon=((targetLon + worldLon*pull + 540)%360)-180;
+    targetLat=clamp(lerp(targetLat,worldLat,pull*0.6),-85,85);
+    gpsMode=surfaceZoom>=2.4;
+    return;
+  }
+  const before=screenToWorld(mx,my);
+  camera.zoom=clamp(camera.zoom*(dir>0?1.22:1/1.22),0.12,48);
+  const after=screenToWorld(mx,my);
+  camera.x += before.x-after.x;
+  camera.y += before.y-after.y;
+  autoPromoteScope();
+}
+function solarBodyScreen(body){ const p=keplerPos(body,simDays); return projectSolar(p.x*10,p.y*10); }
+function populateFocus(){ const opts=[]; opts.push(['milkyway','Galaxy: Milky Way']); galaxies.filter(g=>g.key!=='milkyway').slice(0,20).forEach(g=>opts.push([g.key,'Galaxy: '+g.name])); seedHosts.forEach(h=>opts.push([h.key,'Host: '+h.name])); solarBodies.forEach(b=>opts.push([b.key,'Body: '+b.name])); focusSel.innerHTML=''; for(const [value,label] of opts){ const o=document.createElement('option'); o.value=value; o.textContent=label; focusSel.appendChild(o);} focusSel.value=selectedKey; }
+populateFocus();
+function logCatalog(msg){ catalogLog.textContent = msg + '\n' + catalogLog.textContent; }
+function resetView(){ if(scope==='universe'){camera.x=0;camera.y=0;camera.zoom=1; selectedKey='milkyway';} if(scope==='milkyway'){camera.x=0;camera.y=0;camera.zoom=1.4; selectedKey='proxima';} if(scope==='solar'){camera.x=0;camera.y=0;camera.zoom=0.92; selectedKey='earth';} if(scope==='surface'){surfaceZoom=1.0; targetLat=22; targetLon=-75; selectedKey=surfaceBody; gpsMode=false;} focusSel.value=selectedKey; }
+resetView();
+function setScope(next, keepFocus=true){ scope=next; scopeSel.value=next; if(!keepFocus) resetView(); if(scope==='surface' && !['earth','moon','mars'].includes(selectedKey)) selectedKey=surfaceBody; modePill.textContent = ({universe:'Universe layer',milkyway:'Milky Way layer',solar:'Star-system layer',surface:'Planet surface layer'})[scope]; }
+function zoomStep(dir,mx=pointer.x,my=pointer.y){ if(dir>0) pickObject(mx,my,true); zoomToward(mx,my,dir); autoPromoteScope(dir,mx,my); }
+function autoPromoteScope(dir=0,mx=pointer.x,my=pointer.y){ if(scope==='universe' && camera.zoom>5.2){ if(dir>0) pickObject(mx,my,true); setScope('milkyway'); camera.zoom=1.6; camera.x=0; camera.y=0; if(!hostByKey[selectedKey]) selectedKey='proxima'; } else if(scope==='milkyway' && camera.zoom>7.5){ if(dir>0) pickObject(mx,my,true); setScope('solar'); camera.zoom=0.95; camera.x=0; camera.y=0; if(!solarByKey[selectedKey]) selectedKey='earth'; } else if(scope==='solar' && camera.zoom>8.2 && ['earth','moon','mars'].includes(selectedKey)){ surfaceBody=selectedKey; setScope('surface'); gpsMode=surfaceZoom>=2.4; } else if(scope==='solar' && camera.zoom<0.22){ setScope('milkyway'); camera.zoom=1.6; } else if(scope==='milkyway' && camera.zoom<0.22){ setScope('universe'); camera.zoom=1.0; } focusSel.value=selectedKey; }
+function descend(){ if(scope==='universe'){ setScope('milkyway'); camera.zoom=1.4; camera.x=0; camera.y=0; if(!hostByKey[selectedKey]) selectedKey='proxima'; } else if(scope==='milkyway'){ setScope('solar'); camera.zoom=0.92; camera.x=0; camera.y=0; if(!solarByKey[selectedKey]) selectedKey='earth'; } else if(scope==='solar'){ if(['earth','moon','mars'].includes(selectedKey)){ surfaceBody=selectedKey; setScope('surface'); gpsMode=surfaceZoom>=2.4; } } focusSel.value=selectedKey; }
+function ascend(){ if(scope==='surface'){ setScope('solar'); camera.zoom=1.2; } else if(scope==='solar'){ setScope('milkyway'); camera.zoom=1.6; } else if(scope==='milkyway'){ setScope('universe'); camera.zoom=1.0; } }
+pauseBtn.onclick=()=>{paused=!paused; pauseBtn.textContent=paused?'Resume':'Pause'; status.textContent=paused?'Paused':'Running';}; resetBtn.onclick=()=>resetView(); inBtn.onclick=()=>descend(); outBtn.onclick=()=>ascend();
+scopeSel.onchange=()=>{ setScope(scopeSel.value,false); };
+focusSel.onchange=()=>{ selectedKey=focusSel.value; focusSelected(); };
+timeSlider.oninput=()=>{ simDays=Math.pow(2, Number(timeSlider.value)); if(Number(timeSlider.value)<0) simDays = -Math.pow(2, Math.abs(Number(timeSlider.value))); };
+searchBtn.onclick=()=>searchObject(); searchBox.addEventListener('keydown',e=>{ if(e.key==='Enter') searchObject(); });
+bookmarkBtn.onclick=()=>{ const name=getSelectedName(); if(!name) return; bookmarks.push({key:selectedKey,scope,body:surfaceBody,lat:targetLat,lon:targetLon}); const o=document.createElement('option'); o.value=String(bookmarks.length-1); o.textContent=name+' ['+scope+']'; bookmarkSel.appendChild(o); bookmarkSel.value=String(bookmarks.length-1); };
+bookmarkSel.onchange=()=>{ if(bookmarkSel.value==='') return; const b=bookmarks[+bookmarkSel.value]; if(!b) return; selectedKey=b.key; surfaceBody=b.body||surfaceBody; targetLat=b.lat??targetLat; targetLon=b.lon??targetLon; setScope(b.scope); focusSel.value=selectedKey; focusSelected(); };
+Array.from(document.querySelectorAll('[data-preset]')).forEach(btn=>btn.onclick=()=>{ surfaceBody=btn.dataset.preset; selectedKey=surfaceBody; setScope('surface'); gpsMode=surfaceZoom>=2.4; focusSel.value=selectedKey; });
+sampleBtn.onclick=()=>{ let count=0; for(let i=0;i<250;i++){ const h={key:'sample_'+Date.now()+'_'+i,name:'Sample imported host '+(i+1),distLy:30+Math.round(Math.pow(rng(),1.8)*12000),temp:3000+rng()*5000,planets:1+((rng()*7)|0),theta:rng()*Math.PI*2,r:0.04+Math.pow(rng(),1.4)*0.95}; h.x=Math.cos(h.theta)*h.r; h.y=Math.sin(h.theta)*(h.r*0.42+(Math.sin(h.theta*2.2))*0.04); h.color=starColor(h.temp); hosts.push(h); hostByKey[h.key]=h; count++; } logCatalog('loaded '+count+' extra sample hosts'); };
+catalogFile.onchange=async (e)=>{ const file=e.target.files && e.target.files[0]; if(!file) return; try{ const text=await file.text(); importCatalog(text,file.name); } catch(err){ logCatalog('import failed: '+err.message); } };
+function parseCSV(text){ const lines=text.trim().split(/\r?\n/).filter(Boolean); if(lines.length<2) return []; const headers=lines.shift().split(',').map(s=>s.trim()); return lines.map(line=>{ const cells=line.split(','); const obj={}; headers.forEach((h,i)=>obj[h]=cells[i]?.trim()); return obj; }); }
+function importCatalog(text,name){ let rows; try{ rows = name.toLowerCase().endsWith('.json') ? JSON.parse(text) : parseCSV(text); } catch(err){ logCatalog('parse failed: '+err.message); return; } if(!Array.isArray(rows)){ logCatalog('catalog must be an array'); return; } let hostCount=0, galCount=0; for(const r of rows){ if(('distLy' in r)||('temp' in r)||('planets' in r)){ const h={key:'imp_h_'+(hosts.length+hostCount),name:String(r.name||('Imported host '+(hostCount+1))),distLy:+r.distLy||100,temp:+r.temp||5200,planets:+r.planets||1,theta:+r.theta||rng()*Math.PI*2,r:clamp(+r.r||0.1,0.01,1.2)}; h.x=Math.cos(h.theta)*h.r; h.y=Math.sin(h.theta)*(h.r*0.42 + Math.sin(h.theta*2.5)*0.03); h.color=starColor(h.temp); hosts.push(h); hostByKey[h.key]=h; hostCount++; }
+      else if(('x' in r)||('y' in r)||('size' in r)){ const g={key:'imp_g_'+(galaxies.length+galCount),name:String(r.name||('Imported galaxy '+(galCount+1))),type:String(r.type||'survey'),color:String(r.color||'#d0d8ff'),distMly:+r.distMly||0,size:Math.max(0.03,+r.size||0.1),x:+r.x||0,y:+r.y||0}; galaxies.push(g); galaxyByKey[g.key]=g; galCount++; } }
+    logCatalog('imported '+hostCount+' hosts and '+galCount+' galaxies from '+name); }
+function getSelectedName(){ return solarByKey[selectedKey]?.name || hostByKey[selectedKey]?.name || galaxyByKey[selectedKey]?.name || ''; }
+function searchObject(){ const q=searchBox.value.trim().toLowerCase(); if(!q) return; const all=[...solarBodies,...hosts,...galaxies]; const hit=all.find(o=>o.name.toLowerCase().includes(q)||o.key.toLowerCase().includes(q)); if(!hit){ logCatalog('search miss for "'+q+'"'); return; } selectedKey=hit.key; if(galaxyByKey[hit.key]) setScope('universe'); else if(hostByKey[hit.key]) setScope('milkyway'); else if(['earth','moon','mars'].includes(hit.key)) setScope('solar'); else setScope('solar'); focusSel.value=selectedKey; focusSelected(); }
+function focusSelected(){ if(scope==='surface'){ if(['earth','moon','mars'].includes(selectedKey)) surfaceBody=selectedKey; return; } if(scope==='universe'){ const g=galaxyByKey[selectedKey] || galaxyByKey.milkyway; camera.x=g.x; camera.y=g.y; camera.zoom=Math.max(camera.zoom, g.key==='milkyway'?1.2:4.0); return; } if(scope==='milkyway'){ const h=hostByKey[selectedKey] || hostByKey.proxima; camera.x=h.x; camera.y=h.y; camera.zoom=Math.max(camera.zoom,2.2); return; } if(scope==='solar'){ camera.x=0; camera.y=0; if(['earth','moon','mars'].includes(selectedKey)) camera.zoom=Math.max(camera.zoom,1.2); }}
+function fmt(n,d=2){ return Number(n).toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
+function keplerPos(body, days){ if(!body.aAU) return {x:0,y:0,z:0,rAU:0}; const M=((body.L0Deg-body.omegaDeg-body.OmegaDeg)%360)*DEG + (days/body.periodDays)*Math.PI*2; let E=M; for(let i=0;i<6;i++) E = E - (E - body.e*Math.sin(E) - M)/(1 - body.e*Math.cos(E)); const xv=body.aAU*(Math.cos(E)-body.e), yv=body.aAU*(Math.sqrt(1-body.e*body.e)*Math.sin(E)); const v=Math.atan2(yv,xv), r=Math.hypot(xv,yv); const O=body.OmegaDeg*DEG, i=body.iDeg*DEG, w=body.omegaDeg*DEG; const xh=r*(Math.cos(O)*Math.cos(v+w)-Math.sin(O)*Math.sin(v+w)*Math.cos(i)); const yh=r*(Math.sin(O)*Math.cos(v+w)+Math.cos(O)*Math.sin(v+w)*Math.cos(i)); const zh=r*(Math.sin(v+w)*Math.sin(i)); if(body.parent){ const p=keplerPos(solarByKey[body.parent], days); return {x:xh+p.x,y:yh+p.y,z:zh+p.z,rAU:r}; } return {x:xh,y:yh,z:zh,rAU:r}; }
+function bg(){ const g=ctx.createRadialGradient(innerWidth*0.5, innerHeight*0.36, 0, innerWidth*0.5, innerHeight*0.36, Math.max(innerWidth,innerHeight)*0.75); g.addColorStop(0,'#081229'); g.addColorStop(.6,'#03050b'); g.addColorStop(1,'#010205'); ctx.fillStyle=g; ctx.fillRect(0,0,innerWidth,innerHeight); for(let i=0;i<180;i++){ const x=(i*89.3)%innerWidth, y=(i*53.7)%innerHeight; const a=0.08+((i*17)%100)/240; ctx.fillStyle='rgba(255,255,255,'+a+')'; ctx.fillRect(x,y,1.2,1.2); } }
+function projectUniverse(x,y){ const s=Math.min(innerWidth,innerHeight)*0.058*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.55 + (y-camera.y)*s}; }
+function drawGalaxy(px,py,r,color,type){ ctx.save(); ctx.translate(px,py); ctx.globalCompositeOperation='lighter'; if(type.includes('elliptical')){ const rg=ctx.createRadialGradient(0,0,0,0,0,r); rg.addColorStop(0,'rgba(255,255,255,.8)'); rg.addColorStop(.35,color+'cc'); rg.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=rg; ctx.beginPath(); ctx.ellipse(0,0,r*1.5,r,0,0,Math.PI*2); ctx.fill(); }
+    else if(type.includes('irregular')){ for(let i=0;i<12;i++){ const a=i/12*Math.PI*2, rr=r*(0.45+Math.sin(i*1.7)*0.18+0.3); ctx.fillStyle=color+'66'; ctx.beginPath(); ctx.arc(Math.cos(a)*r*0.35,Math.sin(a)*r*0.25,rr*0.45,0,Math.PI*2); ctx.fill(); } }
+    else { for(let arm=0; arm<2; arm++){ ctx.strokeStyle=color+'90'; ctx.lineWidth=Math.max(1,r*0.08); ctx.beginPath(); for(let t=0;t<46;t++){ const tt=t/45*3.6; const a=tt*1.7 + arm*Math.PI; const rr=r*(0.18 + tt*0.23); ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr*0.72); } ctx.stroke(); } const rg=ctx.createRadialGradient(0,0,0,0,0,r); rg.addColorStop(0,'rgba(255,255,255,.9)'); rg.addColorStop(.25,color+'dd'); rg.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(0,0,r*0.45,0,Math.PI*2); ctx.fill(); }
+    ctx.restore(); }
+function drawUniverse(){ for(const g of galaxies){ const p=projectUniverse(g.x,g.y); const r=Math.max(2.2, g.size*18*camera.zoom); drawGalaxy(p.x,p.y,r,g.color,g.type); if(r>7||selectedKey===g.key){ ctx.fillStyle='rgba(235,243,255,.88)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(g.name,p.x+r+6,p.y-2);} if(selectedKey===g.key){ ctx.strokeStyle='rgba(116,198,255,.85)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(p.x,p.y,r+5,0,Math.PI*2); ctx.stroke(); } }
+}
+function projectMilky(x,y){ const s=Math.min(innerWidth,innerHeight)*0.44*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.56 + (y-camera.y)*s}; }
+function drawMilky(){ ctx.save(); const cx=innerWidth*0.5, cy=innerHeight*0.56; for(let arm=0; arm<4; arm++){ ctx.strokeStyle='rgba(116,198,255,.09)'; ctx.lineWidth=30*camera.zoom; ctx.beginPath(); for(let t=0;t<90;t++){ const tt=t/89; const a=tt*5.4 + arm*Math.PI/2; const rr=(0.08 + tt*0.88)*Math.min(innerWidth,innerHeight)*0.24*camera.zoom; const x=cx + Math.cos(a)*rr; const y=cy + Math.sin(a)*rr*0.42; if(t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke(); }
+  ctx.restore();
+  const drawn = camera.zoom<1.5 ? 500 : camera.zoom<2.8 ? 900 : hosts.length;
+  for(let i=0;i<drawn;i++){ const h=hosts[i]; const p=projectMilky(h.x,h.y); const rr=selectedKey===h.key?4.4:Math.max(1.2, 1.8 + (h.planets||1)*0.08); ctx.fillStyle=h.color; ctx.globalAlpha=selectedKey===h.key?1:.78; ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,Math.PI*2); ctx.fill(); if(selectedKey===h.key || (!h.anonymous && camera.zoom>1.55)){ ctx.fillStyle='rgba(235,243,255,.88)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(h.name,p.x+rr+6,p.y-2); } if(selectedKey===h.key){ ctx.strokeStyle='rgba(116,198,255,.9)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(p.x,p.y,rr+5,0,Math.PI*2); ctx.stroke(); } }
+  ctx.globalAlpha=1;
+}
+function projectSolar(x,y){ const s=Math.min(innerWidth,innerHeight)*0.014*camera.zoom; return {x:innerWidth*0.5 + (x-camera.x)*s, y:innerHeight*0.55 + (y-camera.y)*s}; }
+function radiusPx(body){ const real=body.radiusKm/69911; return Math.max(body.key==='sun'?14:body.key==='earth'?4:2, Math.pow(real,0.45)*14); }
+function drawSolar(){ const sunP=projectSolar(0,0); const g=ctx.createRadialGradient(sunP.x,sunP.y,0,sunP.x,sunP.y,58); g.addColorStop(0,'rgba(255,240,180,.95)'); g.addColorStop(.28,'rgba(255,209,102,.7)'); g.addColorStop(1,'rgba(255,209,102,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sunP.x,sunP.y,58,0,Math.PI*2); ctx.fill();
+  const positions={}; for(const b of solarBodies){ positions[b.key]=keplerPos(b,simDays); }
+  for(const b of solarBodies){ if(!b.aAU || b.parent) continue; ctx.strokeStyle='rgba(116,198,255,.12)'; ctx.lineWidth=1; ctx.beginPath(); for(let t=0;t<=160;t++){ const dd=(t/160)*b.periodDays; const p=keplerPos(b,dd); const pp=projectSolar(p.x*10,p.y*10); if(t===0) ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y);} ctx.stroke(); }
+  for(const b of solarBodies){ const p=positions[b.key]; const pp=projectSolar(p.x*10,p.y*10); const rr=radiusPx(b); const rg=ctx.createRadialGradient(pp.x-rr*0.35,pp.y-rr*0.42,Math.max(1,rr*0.18),pp.x,pp.y,rr*1.18); if(b.key==='earth'){ rg.addColorStop(0,'rgba(135,208,255,.98)'); rg.addColorStop(.45,'rgba(69,122,224,.98)'); rg.addColorStop(1,'rgba(8,24,56,.98)'); } else if(b.key==='mars'){ rg.addColorStop(0,'rgba(255,184,136,.96)'); rg.addColorStop(.5,'rgba(198,92,58,.96)'); rg.addColorStop(1,'rgba(76,28,20,.98)'); } else if(['jupiter','saturn','uranus','neptune'].includes(b.key)){ rg.addColorStop(0,'rgba(255,244,220,.96)'); rg.addColorStop(.55,b.color); rg.addColorStop(1,'rgba(30,24,20,.95)'); } else { rg.addColorStop(0,'rgba(255,255,255,.92)'); rg.addColorStop(.45,b.color); rg.addColorStop(1,'rgba(22,26,36,.95)'); } ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.fill();
+    if(['jupiter','saturn','uranus','neptune'].includes(b.key)){ ctx.save(); ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.clip(); for(let band=-2; band<=2; band++){ ctx.strokeStyle='rgba(255,255,255,'+(0.08+Math.abs(band)*0.03)+')'; ctx.lineWidth=Math.max(1,rr*0.18); ctx.beginPath(); ctx.ellipse(pp.x, pp.y+band*rr*0.18, rr*0.92, rr*0.24, 0, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); }
+    if(b.key==='earth'){ ctx.save(); ctx.beginPath(); ctx.arc(pp.x,pp.y,rr,0,Math.PI*2); ctx.clip(); ctx.fillStyle='rgba(90,196,116,.9)'; ctx.beginPath(); ctx.ellipse(pp.x-rr*0.18,pp.y-rr*0.06,rr*0.28,rr*0.18,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(pp.x+rr*0.22,pp.y+rr*0.02,rr*0.22,rr*0.16,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    if(b.rings){ ctx.strokeStyle='rgba(240,220,170,.55)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(pp.x,pp.y,rr*1.8,rr*0.72,0,0,Math.PI*2); ctx.stroke(); }
+    if(selectedKey===b.key){ ctx.strokeStyle='rgba(116,198,255,.92)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(pp.x,pp.y,rr+6,0,Math.PI*2); ctx.stroke(); }
+    ctx.fillStyle='rgba(235,243,255,.86)'; ctx.font='12px Inter, sans-serif'; if(rr>2.4 || selectedKey===b.key) ctx.fillText(b.name,pp.x+rr+5,pp.y-2);
+  }
+}
+function drawGlobeTexture(bodyName){ const cx=innerWidth*0.5, cy=innerHeight*0.53, r=Math.min(innerWidth,innerHeight)*0.17*surfaceZoom; gpsMode=surfaceZoom>=2.4; const grd=ctx.createRadialGradient(cx-r*0.35,cy-r*0.4,r*0.12,cx,cy,r); if(surfaceBody==='earth'){ grd.addColorStop(0,'#74bdff'); grd.addColorStop(.6,'#255fa8'); grd.addColorStop(1,'#0b1e3c'); } else if(surfaceBody==='mars'){ grd.addColorStop(0,'#f4b08d'); grd.addColorStop(.6,'#bc5e3b'); grd.addColorStop(1,'#47211a'); } else { grd.addColorStop(0,'#f0f2f6'); grd.addColorStop(.6,'#9ea7b5'); grd.addColorStop(1,'#3a4453'); }
+  ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  const lonOffset=(targetLon*DEG + earthSpin*0.2);
+  for(let lat=-75; lat<=75; lat+=15){ const y=Math.sin((lat-targetLat)*DEG)*r; const rx=Math.cos((lat-targetLat)*DEG)*r; ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(cx,cy+y,rx,rx*0.18,0,0,Math.PI*2); ctx.stroke(); }
+  for(let lon=-180; lon<180; lon+=15){ const a=(lon*DEG)+lonOffset; const x=Math.sin(a)*r; const squash=Math.max(0.1,Math.cos(a)); ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(cx+x*0.08,cy,r*Math.abs(squash)*0.06,r,Math.PI/2,0,Math.PI*2); ctx.stroke(); }
+  if(!gpsMode){
+    // synth planet shell
+    for(let i=0;i<28;i++){ const a=i*0.43 + lonOffset*1.25; const rr=r*(0.1 + (i%6)*0.025); const x=cx + Math.sin(a*1.7)*r*0.58; const y=cy + Math.cos(a*0.8 + i*0.2)*r*0.46; ctx.fillStyle=surfaceBody==='earth' ? 'rgba(84,175,101,0.20)' : surfaceBody==='mars' ? 'rgba(110,55,32,0.18)' : 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.ellipse(x,y,rr*0.9,rr*0.42,Math.sin(a)*0.4,0,Math.PI*2); ctx.fill(); }
+    if(['jupiter','saturn','uranus','neptune'].includes(surfaceBody)){ for(let band=-4; band<=4; band++){ ctx.strokeStyle='rgba(255,255,255,'+(0.08+Math.abs(band)*0.015)+')'; ctx.lineWidth=Math.max(1.5,r*0.06); ctx.beginPath(); ctx.ellipse(cx, cy+band*r*0.09, r*0.92, r*0.18, 0, 0, Math.PI*2); ctx.stroke(); } }
+  } else {
+    // GPS-style tile guidance near surface
+    const tileStep=12.5; const majorStep=45;
+    for(let lat=-90; lat<=90; lat+=tileStep){ const yy=Math.sin((lat-targetLat)*DEG)*r; const rx=Math.max(r*0.12,Math.cos((lat-targetLat)*DEG)*r); ctx.strokeStyle=(Math.abs(lat%majorStep)<0.001)?'rgba(116,198,255,.30)':'rgba(116,198,255,.14)'; ctx.lineWidth=(Math.abs(lat%majorStep)<0.001)?1.4:0.8; ctx.beginPath(); ctx.ellipse(cx,cy+yy,rx,Math.max(rx*0.18,1),0,0,Math.PI*2); ctx.stroke(); }
+    for(let lon=-180; lon<180; lon+=tileStep){ const a=(lon*DEG)+lonOffset; const x=Math.sin(a)*r; const squash=Math.max(0.08,Math.cos(a)); ctx.strokeStyle=(Math.abs(lon%majorStep)<0.001)?'rgba(116,198,255,.28)':'rgba(116,198,255,.12)'; ctx.lineWidth=(Math.abs(lon%majorStep)<0.001)?1.2:0.7; ctx.beginPath(); ctx.ellipse(cx+x*0.08,cy,r*Math.abs(squash)*0.05,r,Math.PI/2,0,Math.PI*2); ctx.stroke(); }
+    const px=clamp(Math.round((targetLon+180)/tileStep),0,999), py=clamp(Math.round((targetLat+90)/tileStep),0,999);
+    ctx.fillStyle='rgba(116,198,255,.18)'; ctx.fillRect(cx-r*0.92, cy+r*0.72, r*1.84, r*0.18);
+    ctx.fillStyle='rgba(235,243,255,.95)'; ctx.font='12px Inter, sans-serif'; ctx.fillText('GPS tile '+surfaceBody.toUpperCase()+' '+px+':'+py+'  lat '+targetLat.toFixed(2)+'°  lon '+targetLon.toFixed(2)+'°', cx-r*0.86, cy+r*0.84);
+    if(surfaceBody==='earth'){
+      ctx.fillStyle='rgba(84,175,101,.88)';
+      const continents=[[-0.55,-0.18,0.22,0.34],[-0.18,-0.06,0.16,0.24],[0.08,-0.16,0.34,0.16],[0.22,0.12,0.22,0.26],[0.54,-0.1,0.13,0.12]];
+      for(const c of continents){ const [x,y,w,h]=c; ctx.beginPath(); ctx.ellipse(cx + (x+Math.sin(lonOffset+x*2)*0.04)*r, cy + y*r, w*r*Math.max(.25,Math.cos(lonOffset+x*2)), h*r, 0, 0, Math.PI*2); ctx.fill(); }
+      ctx.fillStyle='rgba(255,255,255,.10)'; for(let i=0;i<14;i++){ ctx.beginPath(); ctx.ellipse(cx + Math.sin(i*0.8+lonOffset*1.2)*r*0.65, cy + Math.cos(i*0.45)*r*0.45, r*0.16, r*0.04, 0, 0, Math.PI*2); ctx.fill(); }
+    } else if(surfaceBody==='mars'){
+      ctx.fillStyle='rgba(110,55,32,.36)'; for(let i=0;i<9;i++){ ctx.beginPath(); ctx.arc(cx + Math.sin(i+lonOffset)*r*0.55, cy + Math.cos(i*0.7)*r*0.45, r*(0.04+((i%3)*0.018)), 0, Math.PI*2); ctx.fill(); }
+    } else {
+      ctx.fillStyle='rgba(255,255,255,.10)'; for(let i=0;i<11;i++){ ctx.beginPath(); ctx.arc(cx + Math.sin(i*0.73+lonOffset)*r*0.6, cy + Math.cos(i*0.52)*r*0.5, r*(0.03+((i%4)*0.014)), 0, Math.PI*2); ctx.fill(); }
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,r+1,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='rgba(116,198,255,.85)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(cx-18,cy); ctx.lineTo(cx+18,cy); ctx.moveTo(cx,cy-18); ctx.lineTo(cx,cy+18); ctx.stroke();
+  ctx.fillStyle='rgba(235,243,255,.9)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(bodyName+(gpsMode?' GPS target':' synth shell'), cx-r, cy-r-12);
+}
+function selectedStats(){
+  if(scope==='universe'){ const g=galaxyByKey[selectedKey]||galaxyByKey.milkyway; return [['Type',g.type],['Distance',fmt(g.distMly,2)+' million ly'],['Render size',fmt(g.size,2)],['Catalog key',g.key],['Known shell', g.key==='milkyway'?'primary galaxy':'survey/curated']]; }
+  if(scope==='milkyway'){ const h=hostByKey[selectedKey]||hostByKey.proxima; return [['Distance',fmt(h.distLy,2)+' ly'],['Star temp',fmt(h.temp,0)+' K'],['Planets',h.planets],['Arm radius',fmt(h.r,3)],['Catalog key',h.key]]; }
+  if(scope==='solar'){ const b=solarByKey[selectedKey]||solarByKey.earth; const p=keplerPos(b,simDays); return [['Type',b.type],['Radius',fmt(b.radiusKm,1)+' km'],['Semi-major axis',fmt(b.aAU,6)+' AU'],['Eccentricity',fmt(b.e,4)],['Orbital period',fmt(b.periodDays,2)+' days'],['Current heliocentric distance',fmt(p.rAU||0,6)+' AU']]; }
+  const b=solarByKey[surfaceBody]||solarByKey.earth; return [['Surface body',b.name],['Latitude',fmt(targetLat,2)+'°'],['Longitude',fmt(targetLon,2)+'°'],['Surface zoom',fmt(surfaceZoom,2)+'×'],['Renderer', gpsMode?'gps-guided local globe':'synth-generated globe'],['Map layer', gpsMode?(surfaceBody==='earth'?'earth lat/lon tile guidance':'placeholder lat/lon guidance'):'procedural synth shell']];
+}
+function updateUI(){ updateHudLayout(); const rows=selectedStats(); stats.innerHTML=''; for(const [k,v] of rows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; stats.appendChild(a); stats.appendChild(b); }
+  engineStats.innerHTML=''; const erows=[['Scope',scope],['Selected',getSelectedName()||'none'],['Camera zoom',scope==='surface'?fmt(surfaceZoom,2)+'×':fmt(camera.zoom,2)+'×'],['Aim zoom','pointer-anchored target descent'],['Galaxy count',galaxies.length],['Host count',hosts.length],['Bodies',solarBodies.length],['Surface body',surfaceBody],['Surface mode', gpsMode?'GPS tile guidance':'Synth globe']]; for(const [k,v] of erows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; engineStats.appendChild(a); engineStats.appendChild(b); }
+  sourceStats.innerHTML=''; const srows = scope==='solar' || scope==='surface' ? [['Orbit truth',dataSources.solar],['Body sizes',dataSources.sizes],['Surface shell', gpsMode?'lat/lon guidance shell (offline)':'procedural synth globe']] : scope==='milkyway' ? [['Host shell',dataSources.exoplanets],['Starfield shell',dataSources.milkyway],['Known limitation','offline curated + synthetic host mix']] : [['Galaxy shell',dataSources.galaxies],['Milky Way node','curated primary anchor'],['Known limitation','survey-style scatter, not full live NED ingest']]; for(const [k,v] of srows){ const a=document.createElement('div'); a.textContent=k; const b=document.createElement('div'); b.textContent=v; sourceStats.appendChild(a); sourceStats.appendChild(b); }
+  const now=new Date(epoch.getTime()+simDays*86400000); epochLabel.textContent=now.toISOString(); speedLabel.textContent=(scope==='surface'?'surface mode':fmt(simDays,2)+' sim days / sec');
+  panelTitle.textContent = ({universe:'Universe',milkyway:'Milky Way',solar:'Star System',surface:(solarByKey[surfaceBody]?.name||'Planet')+' Surface'})[scope];
+  panelDesc.textContent = scope==='universe' ? 'Galaxy shell with colorized classes, survey-style scatter, and explicit truth/render separation. Use wheel zoom to descend toward your aimed target.' : scope==='milkyway' ? 'Milky Way host-system shell. Named hosts stay explicit while synthetic density keeps the map readable and low-weight.' : scope==='solar' ? 'Analytic heliocentric solver for the Sun, planets, Moon, and Pluto using authored orbital fields. Select Earth, Moon, or Mars, then descend into the surface renderer.' : 'Local 2D-but-visually-3D globe. Bodies stay synth-generated until close zoom, then flip into GPS-style lat/lon guidance.';
+}
+canvas.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); if(scope!=='surface') pickObject(e.clientX,e.clientY); });
+canvas.addEventListener('pointermove',e=>{ pointer.x=e.clientX; pointer.y=e.clientY; if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag={x:e.clientX,y:e.clientY}; if(scope==='surface'){ targetLon = ((targetLon - dx*0.35 + 540)%360)-180; targetLat = clamp(targetLat + dy*0.18,-85,85); } else { const scale=currentScale(); camera.x -= dx/scale; camera.y -= dy/scale; } });
+canvas.addEventListener('pointerup',()=>drag=null); canvas.addEventListener('pointercancel',()=>drag=null);
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); pointer.x=e.clientX; pointer.y=e.clientY; zoomStep(e.deltaY<0?1:-1,e.clientX,e.clientY); }, {passive:false});
+window.addEventListener('keydown',e=>{ if(e.key===' ') { e.preventDefault(); pauseBtn.click(); } else if(e.key==='Enter') descend(); else if(e.key==='Backspace'){ e.preventDefault(); ascend(); } else if(e.key==='1') setScope('universe'); else if(e.key==='2') setScope('milkyway'); else if(e.key==='3') setScope('solar'); else if(e.key==='4') setScope('surface'); else if(e.key==='[') { timeSlider.value=Math.max(-6, +timeSlider.value-1); timeSlider.oninput(); } else if(e.key===']'){ timeSlider.value=Math.min(8, +timeSlider.value+1); timeSlider.oninput(); } else if(e.key.toLowerCase()==='f') focusSelected(); });
+function pickObject(mx,my,forceNearest=false){ let best=null,bestD=1e9; if(scope==='universe'){ for(const g of galaxies){ const p=projectUniverse(g.x,g.y), d=Math.hypot(mx-p.x,my-p.y); if(d<bestD && (forceNearest || d<36)){ best=g.key; bestD=d; } } } else if(scope==='milkyway'){ const count=camera.zoom<1.5?500:camera.zoom<2.8?900:hosts.length; for(let i=0;i<count;i++){ const h=hosts[i], p=projectMilky(h.x,h.y), d=Math.hypot(mx-p.x,my-p.y); if(d<bestD && (forceNearest || d<18)){ best=h.key; bestD=d; } } } else if(scope==='solar'){ for(const b of solarBodies){ const p=keplerPos(b,simDays), pp=projectSolar(p.x*10,p.y*10), d=Math.hypot(mx-pp.x,my-pp.y); if(d<bestD && (forceNearest || d<22)){ best=b.key; bestD=d; } } } if(best){ selectedKey=best; focusSel.value=selectedKey; return best; } return null; }
+function frame(){ requestAnimationFrame(frame); if(!paused && scope!=='surface'){ earthSpin += 0.015; } if(!paused && scope!=='surface') simDays += (Number(timeSlider.value)>=0?Math.pow(2,Number(timeSlider.value)):-Math.pow(2,Math.abs(Number(timeSlider.value))))/60; bg(); if(scope==='universe') drawUniverse(); else if(scope==='milkyway') drawMilky(); else if(scope==='solar') drawSolar(); else drawGlobeTexture(solarByKey[surfaceBody]?.name||'Earth'); updateUI(); }
+frame();
+})();
+</script>
+</body>
+</html>
